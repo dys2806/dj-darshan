@@ -7,6 +7,7 @@ import { isConnected, sp, friendly } from '../lib/spotify.js';
 import { getNow, bustNow } from '../lib/now.js';
 import { sendToSpotify } from '../lib/queue.js';
 import { keepsakeStatus, picksCsv } from '../lib/keepsake.js';
+import { partyConfig } from '../lib/config.js';
 
 // Pending requests, oldest first (first come, first served).
 async function pendingList() {
@@ -32,7 +33,7 @@ export default async function handler(req, res) {
     if (connected) {
       try { now = await getNow(); } catch (e) { playerError = friendly(e); }
     }
-    return res.status(200).json({ connected, settings, pending, log, now, playerError, keepsake });
+    return res.status(200).json({ connected, settings, pending, log, now, playerError, keepsake, config: partyConfig() });
   }
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'GET or POST only' });

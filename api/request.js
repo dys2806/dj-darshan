@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
   const trackId = String(req.body?.trackId || '');
   const by = String(req.body?.guestName || '').trim().slice(0, 30) || 'A guest';
-  // Optional dedication ("For Kirti 💛"): plain text, single line, 60 chars max.
+  // Optional dedication ("For the hosts 💛"): plain text, single line, 60 chars max.
   const dedication = String(req.body?.dedication || '').replace(/\s+/g, ' ').trim().slice(0, 60);
   if (!TRACK_ID.test(trackId)) return res.status(400).json({ status: 'error', error: 'That isn’t a valid song.' });
 

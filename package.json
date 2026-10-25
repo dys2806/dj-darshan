@@ -2,7 +2,7 @@
   "name": "party-dj",
   "version": "1.0.0",
   "private": true,
-  "description": "QR-code song requests that land in the host's Spotify queue",
+  "description": "QR song requests that land in the host’s Spotify queue — Diwali-themed party DJ",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -12,5 +12,10 @@
   },
   "scripts": {
     "test": "node test/run.mjs"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dys2806/dj-darshan"
   }
 }

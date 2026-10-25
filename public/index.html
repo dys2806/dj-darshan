@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#14081f">
-  <title>DJ Darshan · Request a Song</title>
+  <title>Request a Song</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/diwali.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -52,6 +52,9 @@
     @keyframes pop { from { opacity: 0; transform: translateY(6px); } }
     .row .dedication { font-size: .85rem; }
 
+    .credit { text-align: center; margin: 40px 0 8px; font-size: .8rem; }
+    .credit a { color: var(--muted); text-decoration: none; border-bottom: 1px dotted var(--muted); }
+
     @media (prefers-reduced-motion: reduce) { .stage, #results .row { animation: none !important; } }
   </style>
 </head>
@@ -68,17 +71,17 @@
     <svg class="rangoli" id="rangoli" aria-hidden="true"></svg>
     <div class="partyline">
       <svg class="diya" viewBox="0 0 40 44" aria-hidden="true"><use href="#diya"/></svg>
-      <div class="party" id="party">Himanshu and Kirti’s Diwali Party</div>
+      <div class="party" id="party">&nbsp;</div>
       <svg class="diya" viewBox="0 0 40 44" aria-hidden="true"><use href="#diya"/></svg>
     </div>
     <div class="onair">ON AIR</div>
-    <h1><span class="djwrap"><span class="djname" id="djName">DJ Darshan</span></span></h1>
-    <p class="tagline">You pick the song. <b>He plays it.</b></p>
-    <div class="partychip">✨ Shubh Deepavali · requests open all night</div>
+    <h1><span class="djwrap"><span class="djname" id="djName">&nbsp;</span></span></h1>
+    <p class="tagline">You pick the song. <b id="playsIt">The DJ plays it.</b></p>
+    <div class="partychip" id="greeting">&nbsp;</div>
     <div class="howto"><span><b>1</b> Search</span><span><b>2</b> Tap Add</span><span><b>3</b> Dance</span></div>
   </header>
 
-  <div id="offline" class="banner hidden">Darshan hasn’t connected Spotify yet. Requests open soon.</div>
+  <div id="offline" class="banner hidden"><span id="offlineWho">The DJ</span> hasn’t connected Spotify yet. Requests open soon.</div>
 
   <!-- Now playing -->
   <div class="card now stage" id="stage">
@@ -92,10 +95,10 @@
   </div>
 
   <h2>Your name</h2>
-  <input id="name" type="text" maxlength="30" placeholder="So Darshan knows who picked it (optional)" autocomplete="nickname">
+  <input id="name" type="text" maxlength="30" placeholder="So the DJ knows who picked it (optional)" autocomplete="nickname">
 
   <h2>Dedicate it 💌</h2>
-  <input id="dedication" type="text" maxlength="60" placeholder="e.g. For Kirti, the best host ever (optional)" autocomplete="off">
+  <input id="dedication" type="text" maxlength="60" placeholder="e.g. For our amazing hosts 💛 (optional)" autocomplete="off">
   <p class="hint">Shows next to your song in Up Next and on the big screen.</p>
 
   <h2>Find a song</h2>
@@ -104,6 +107,9 @@
 
   <h2>Up next</h2>
   <ul class="list" id="upnext"><li class="empty">Nothing queued yet.</li></ul>
+
+  <!-- Credit + link for anyone who wants their own copy -->
+  <footer class="credit"><a id="repoLink" href="https://github.com/dys2806/dj-darshan" target="_blank" rel="noopener">🎧 Want this for your party? Get it free on GitHub</a></footer>
 
   <div class="toast" id="toast"></div>
 
@@ -135,6 +141,24 @@ const store = {
   get: (k) => { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
   set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
 };
+
+// ---- party settings (names, titles) come from the server; last copy is remembered so the page paints instantly ----
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+let CFG = { djFirstName: 'the DJ' };
+function applyConfig(c) {
+  if (!c || !c.djName) return;
+  CFG = c;
+  $('djName').textContent = c.djName;
+  $('party').textContent = c.partyName;
+  $('greeting').textContent = c.greeting;
+  $('playsIt').textContent = `${cap(c.djFirstName)} plays it.`;
+  $('offlineWho').textContent = cap(c.djFirstName);
+  $('name').placeholder = `So ${c.djFirstName} knows who picked it (optional)`;
+  $('dedication').placeholder = `e.g. ${c.dedicationExample} (optional)`;
+  if (c.repoUrl) $('repoLink').href = c.repoUrl;
+  document.title = `${c.djName} · ${c.partyName}`;
+}
+try { applyConfig(JSON.parse(localStorage.getItem('dj-config') || 'null')); } catch {}
 
 // ---- decorations ------------------------------------------------------------
 Diwali.diyaDefs();
@@ -219,7 +243,7 @@ async function request(t, btn) {
     const ok = data.status === 'queued' || data.status === 'pending';
     if (ok) { celebrate(btn); $('dedication').value = ''; } // a dedication goes with one song only
     if (data.status === 'queued') { btn.textContent = 'Queued ✓'; toast(`🎆 “${t.name}” is in the queue!`, 'ok'); refreshNow(); }
-    else if (data.status === 'pending') { btn.textContent = 'Sent ✓'; toast(`🪔 “${t.name}” sent to Darshan for approval.`, 'ok'); }
+    else if (data.status === 'pending') { btn.textContent = 'Sent ✓'; toast(`🪔 “${t.name}” sent to ${CFG.djFirstName} for approval.`, 'ok'); }
     else if (data.status === 'duplicate') { btn.textContent = 'Requested'; toast(data.error, 'warn'); }
     else if (data.status === 'blocked') { btn.textContent = 'Explicit'; toast(data.error, 'warn'); }
     else { btn.disabled = false; btn.textContent = 'Add'; toast(data.error || 'Couldn’t add that one', 'bad'); }
@@ -232,9 +256,8 @@ async function request(t, btn) {
 async function refreshNow() {
   try {
     const d = await (await fetch('/api/nowplaying')).json();
-    if (d.djName) $('djName').textContent = d.djName;
-    if (d.partyName) $('party').textContent = d.partyName;
-    document.title = `${d.djName || 'DJ'} · ${d.partyName || 'Request a Song'}`;
+    applyConfig(d);
+    store.set('dj-config', JSON.stringify({ partyName: d.partyName, djName: d.djName, djFirstName: d.djFirstName, greeting: d.greeting, dedicationExample: d.dedicationExample, repoUrl: d.repoUrl }));
     document.body.classList.toggle('music-on', Boolean(d.current)); // record spins, EQ + name dance with music
     $('offline').classList.toggle('hidden', d.connected);
 

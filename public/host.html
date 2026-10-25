@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex">
-  <title>DJ Darshan · Booth</title>
+  <title>DJ Booth</title>
   <link rel="stylesheet" href="/style.css">
   <style>
     .toggle { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
@@ -21,14 +21,14 @@
 <body>
   <!-- PIN gate: only the host gets past this. -->
   <section id="gate">
-    <h1>DJ Darshan · Booth</h1>
+    <h1 class="booth">DJ Booth</h1>
     <p class="sub">Enter your host PIN.</p>
     <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="PIN">
     <div class="bar"><button class="go" id="enter">Unlock</button></div>
   </section>
 
   <section id="app" class="hidden">
-    <h1>DJ Darshan · Booth</h1>
+    <h1 class="booth">DJ Booth</h1>
     <div id="msg" class="banner hidden"></div>
 
     <!-- Spotify connection -->
@@ -77,7 +77,7 @@
     <div class="card" id="keepsake">
       <!-- Shown until the host re-connects Spotify with playlist permission -->
       <div id="ksOff" class="hidden">
-        <p style="margin-top:0">Every guest song can be saved to a private Spotify playlist for Himanshu and Kirti. Reconnect Spotify once to allow it.</p>
+        <p style="margin-top:0">Every guest song can be saved to a private Spotify playlist, a keepsake for the hosts. Reconnect Spotify once to allow it.</p>
         <button class="go" id="ksConnect">Reconnect Spotify</button>
       </div>
       <div id="ksOn" class="hidden">
@@ -201,6 +201,9 @@ async function refresh() {
   // Up next
   const up = d.now?.upNext || [];
   $('upnext').replaceChildren(...(up.length ? up.map((t) => row(t, null)) : [el('li', { className: 'empty', textContent: 'Queue is empty.' })]));
+
+  // Title from party settings
+  if (d.config?.djName) { for (const h of document.querySelectorAll('.booth')) h.textContent = `${d.config.djName} · Booth`; document.title = `${d.config.djName} · Booth`; }
 
   // Keepsake playlist status
   const ks = d.keepsake || {};

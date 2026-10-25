@@ -132,7 +132,7 @@ r = await call('callback', { query: { code: 'xyz', state: loc.searchParams.get('
 check('state cannot be reused', r.code === 400);
 
 // 3. Auto mode (default) with explicit blocked (default)
-r = await guestReq('AAAAAAAAAAAAAAAAAAAAAA', 'Priya', '  For   Kirti 💛 ');
+r = await guestReq('AAAAAAAAAAAAAAAAAAAAAA', 'Priya', '  For   the hosts 💛 ');
 check('auto mode: clean song queued straight to Spotify', r.body.status === 'queued' && spotifyQueue.includes('AAAAAAAAAAAAAAAAAAAAAA'));
 r = await guestReq('AAAAAAAAAAAAAAAAAAAAAA', 'Rahul');
 check('duplicate blocked', r.code === 409 && r.body.status === 'duplicate');
@@ -148,7 +148,7 @@ check('search marks requested songs as taken + reports explicit setting', a.take
 db.delete(K.now);
 r = await call('nowplaying');
 check('up next shows who requested', r.body.upNext[0]?.requestedBy === 'Priya' && r.body.current.name === 'Playing Now', JSON.stringify(r.body));
-check('dedication shown in Up Next, whitespace tidied', r.body.upNext[0]?.dedication === 'For Kirti 💛', JSON.stringify(r.body.upNext[0]));
+check('dedication shown in Up Next, whitespace tidied', r.body.upNext[0]?.dedication === 'For the hosts 💛', JSON.stringify(r.body.upNext[0]));
 
 // 4. Switch to approval mode
 r = await call('host', { method: 'POST', headers: host, body: { action: 'setMode', mode: 'approve' } });
@@ -194,13 +194,21 @@ check('skip calls Spotify next', r.code === 200 && calls.includes('POST /v1/me/p
 await call('host', { method: 'POST', headers: host, body: { action: 'reset' } });
 check('reset clears requests but keeps Spotify login', !db.has(K.taken) && !db.has(K.log) && peek(K.refresh) === 'RT');
 
+// 8b. Party settings: generic defaults, overridable per party
+r = await call('nowplaying');
+check('settings: generic defaults when nothing is set', r.body.partyName === 'Diwali Party' && r.body.djName === 'DJ' && r.body.djFirstName === 'the DJ' && r.body.queueTitle === 'Song Request Queue' && r.body.repoUrl.includes('github.com') && !('timezone' in r.body), JSON.stringify(r.body).slice(0, 300));
+Object.assign(process.env, { PARTY_NAME: 'Asha and Raj’s Diwali Party', DJ_NAME: 'DJ Rohan', QUEUE_TITLE: 'Diwali Song Request Queue' });
+r = await call('nowplaying');
+check('settings: party values come from environment', r.body.partyName === 'Asha and Raj’s Diwali Party' && r.body.djFirstName === 'Rohan' && r.body.queueTitle === 'Diwali Song Request Queue');
+for (const k of ['PARTY_NAME', 'DJ_NAME', 'QUEUE_TITLE']) delete process.env[k];
+
 // 9. Keepsake playlist + picks log
 r = await call('host', { headers: host });
 const ks = r.body.keepsake;
 check('keepsake: one private playlist created for the night', playlistsCreated === 1 && ks.enabled && ks.url === 'https://open.spotify.com/playlist/PL1', JSON.stringify(ks));
 check('keepsake: every queued guest song saved to it', ks.count >= 3 && playlistItems.length === ks.count && playlistItems.includes('PL1:AAAAAAAAAAAAAAAAAAAAAA'), JSON.stringify({ ks, playlistItems }));
 r = await call('host', { headers: host, query: { export: 'csv' } });
-check('keepsake: CSV has song, guest and dedication', r.headers['Content-Type'].startsWith('text/csv') && r.body.includes('#,Time,Song,Artist,Requested by,Dedication') && r.body.includes('"Clean Song","Artist","Priya","For Kirti 💛"'), r.body.slice(0, 300));
+check('keepsake: CSV has song, guest and dedication', r.headers['Content-Type'].startsWith('text/csv') && r.body.includes('#,Time,Song,Artist,Requested by,Dedication') && r.body.includes('"Clean Song","Artist","Priya","For the hosts 💛"'), r.body.slice(0, 300));
 check('keepsake: reset night keeps the keepsake', peek(K.picks)?.length === ks.count && peek(K.keepsake));
 
 // a broken playlist call never stops the song from playing

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Diwali Song Request Queue</title>
+  <title>Song Request Queue</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,6 +21,9 @@
     #qr img, #qr canvas { display: block; width: 300px; height: 300px; }
     .steps { color: var(--muted); font-size: 1.05rem; }
     .steps b { color: var(--text); }
+    .getit { display: inline-flex; align-items: center; gap: 8px; margin-top: 26px; color: var(--muted); font-size: .72rem; text-align: left; line-height: 1.3; opacity: .8; }
+    #repoQr { background: #fff; padding: 3px; border-radius: 4px; }
+    #repoQr img, #repoQr canvas { display: block; width: 52px !important; height: 52px !important; }
     @media print {
       body { background: #fff; }
       :root { --text: #000; --muted: #333; --accent: #a34a00; }
@@ -29,13 +32,19 @@
   </style>
 </head>
 <body>
-  <div class="party" id="party">🪔 Himanshu and Kirti’s Diwali Party 🪔</div>
-  <div class="title">Diwali Song<br>Request Queue</div>
-  <div class="dj" id="dj">with DJ Darshan</div>
+  <div class="party" id="party">&nbsp;</div>
+  <div class="title" id="queueTitle">Song Request Queue</div>
+  <div class="dj" id="dj">&nbsp;</div>
   <div id="qr"></div>
   <div class="steps"><b>Scan</b> · pick a song · add a dedication 💌</div>
   <p class="sub" style="margin-top:6px">No app or login needed.</p>
   <p class="noprint" style="margin-top:22px"><button class="go" onclick="print()">Print poster</button></p>
+
+  <!-- Very small QR for people who want this app for their own party (not for song requests) -->
+  <div class="getit">
+    <div id="repoQr"></div>
+    <div>Want this for your party?<br>Scan for the free app</div>
+  </div>
 
 <script>
 // The QR code opens the guest page on this same site. The address itself isn't printed.
@@ -44,10 +53,26 @@ new QRCode(document.getElementById('qr'), {
   colorDark: '#000000', colorLight: '#ffffff',
   correctLevel: QRCode.CorrectLevel.M,
 });
+// Headline split over two lines on the last two words ("Diwali Song / Request Queue").
+function setTitle(t) {
+  const words = t.split(' '), el = document.getElementById('queueTitle');
+  el.replaceChildren();
+  const cut = Math.max(1, words.length - 2);
+  el.append(words.slice(0, cut).join(' '));
+  if (words.length > 2) { el.append(document.createElement('br')); el.append(words.slice(cut).join(' ')); }
+}
+// Tiny QR to the GitHub repo.
+function drawRepoQr(url) {
+  const box = document.getElementById('repoQr');
+  box.replaceChildren();
+  new QRCode(box, { text: url, width: 200, height: 200, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.L });
+}
 fetch('/api/nowplaying').then((r) => r.json()).then((d) => {
   if (d.partyName) document.getElementById('party').textContent = `🪔 ${d.partyName} 🪔`;
   if (d.djName) document.getElementById('dj').textContent = `with ${d.djName}`;
-}).catch(() => {});
+  if (d.queueTitle) { setTitle(d.queueTitle); document.title = d.queueTitle; }
+  drawRepoQr(d.repoUrl || 'https://github.com/dys2806/dj-darshan');
+}).catch(() => drawRepoQr('https://github.com/dys2806/dj-darshan'));
 </script>
 </body>
 </html>

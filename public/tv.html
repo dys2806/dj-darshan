@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <title>DJ Darshan · Big Screen</title>
+  <title>Big Screen</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/diwali.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -79,7 +79,13 @@
     .announce .l2 { font-size: 2.6vmin; margin-top: .6vmin; font-style: italic; }
 
     /* ---- one-tap full screen (browsers require a tap) ---- */
-    .start { position: fixed; left: 2vmin; bottom: 2vmin; z-index: 26; font-size: 1.8vmin; padding: 1.2vmin 2vmin;
+    .getit { position: fixed; left: 2vmin; bottom: 2vmin; z-index: 24; display: flex; align-items: center; gap: 1vmin;
+      padding: .8vmin 1.2vmin .8vmin .8vmin; border-radius: 1.2vmin; background: rgba(20, 8, 31, .7);
+      border: 1px solid rgba(255,255,255,.08); color: var(--muted); text-decoration: none; opacity: .85; }
+    #repoQr { background: #fff; padding: .4vmin; border-radius: .6vmin; }
+    #repoQr img, #repoQr canvas { display: block; width: 6.5vmin !important; height: 6.5vmin !important; }
+    .getit .gt { font-size: 1.3vmin; line-height: 1.25; }
+    .start { position: fixed; left: calc(2vmin + 19vmin); bottom: 2vmin; z-index: 26; font-size: 1.8vmin; padding: 1.2vmin 2vmin;
       background: rgba(34, 16, 48, .9); border: 1px solid rgba(255, 194, 61, .4); color: var(--text); }
     .offline { position: fixed; left: 50%; bottom: 3vmin; transform: translateX(-50%); z-index: 26; font-size: 2vmin; }
 
@@ -117,11 +123,11 @@
       <div class="brand">
         <div class="partyline">
           <svg class="diya" viewBox="0 0 40 44" aria-hidden="true"><use href="#diya"/></svg>
-          <div class="party" id="party">Himanshu and Kirti’s Diwali Party</div>
+          <div class="party" id="party">&nbsp;</div>
           <svg class="diya" viewBox="0 0 40 44" aria-hidden="true"><use href="#diya"/></svg>
         </div>
         <div class="onair">ON AIR</div>
-        <div><span class="djwrap"><span class="djname" id="djName">DJ Darshan</span></span></div>
+        <div><span class="djwrap"><span class="djname" id="djName">&nbsp;</span></span></div>
       </div>
 
       <div class="panel upnext">
@@ -134,7 +140,7 @@
         <div class="qrtext">
           <div class="big">🎵 Scan to add a song</div>
           <div class="small">No app or login. Add a dedication too 💌</div>
-          <div class="url">Diwali Song Request Queue</div>
+          <div class="url" id="queueTitle">&nbsp;</div>
         </div>
       </div>
     </section>
@@ -142,7 +148,13 @@
 
   <div class="announce" id="announce" role="status"><div class="l1" id="annL1"></div><div class="l2" id="annL2"></div></div>
   <button class="start" id="start">⛶ Full screen</button>
-  <div class="banner offline hidden" id="offline">Darshan hasn’t connected Spotify yet.</div>
+  <div class="banner offline hidden" id="offline"><span id="offlineWho">The DJ</span> hasn’t connected Spotify yet.</div>
+
+  <!-- Small corner card for anyone who wants their own copy -->
+  <a class="getit" id="getit" href="https://github.com/dys2806/dj-darshan" target="_blank" rel="noopener">
+    <div id="repoQr"></div>
+    <div class="gt">Get this for<br>your party</div>
+  </a>
 
 <script src="/diwali.js"></script>
 <script>
@@ -160,6 +172,17 @@ fx.ambient(4500, 1.6); // bigger, more frequent fireworks on a big screen
 // ---- QR code pointing at the guest page ----------------------------------------
 const target = location.origin + '/';
 new QRCode($('qr'), { text: target, width: 512, height: 512, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+
+// Small QR to the GitHub repo, drawn once we know the address from the settings.
+let repoQrFor = null;
+function drawRepoQr(url) {
+  if (!url || url === repoQrFor) return;
+  repoQrFor = url;
+  $('repoQr').replaceChildren();
+  $('getit').href = url;
+  new QRCode($('repoQr'), { text: url, width: 256, height: 256, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.L });
+}
+drawRepoQr('https://github.com/dys2806/dj-darshan');
 
 // ---- full screen + keep the screen awake ------------------------------------------
 let wakeLock = null;
@@ -199,6 +222,10 @@ async function refresh() {
     const d = await (await fetch('/api/nowplaying')).json();
     if (d.djName) $('djName').textContent = d.djName;
     if (d.partyName) $('party').textContent = d.partyName;
+    if (d.queueTitle) $('queueTitle').textContent = d.queueTitle;
+    if (d.djFirstName) $('offlineWho').textContent = d.djFirstName.charAt(0).toUpperCase() + d.djFirstName.slice(1);
+    if (d.djName) document.title = `${d.djName} · Big Screen`;
+    drawRepoQr(d.repoUrl);
     $('offline').classList.toggle('hidden', d.connected);
     document.body.classList.toggle('music-on', Boolean(d.current));
 
