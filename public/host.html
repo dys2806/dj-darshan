@@ -164,7 +164,11 @@ function row(t, right) {
     el('div', { className: 'artist', textContent: t.artists + (t.by || t.requestedBy ? ` · ${t.by || t.requestedBy}` : '') }));
   if (t.dedication) meta.append(el('div', { className: 'artist', style: 'color:#ffd9e8;font-style:italic', textContent: `💌 “${t.dedication}”` }));
   if (t.note) meta.append(el('div', { className: 'artist', style: 'color:var(--warn)', textContent: t.note }));
-  return el('li', { className: 'row' }, el('img', { src: t.thumb || '', alt: '' }), meta, right);
+  // Album art, or an empty tile (never a broken-image icon) if there's none or it fails to load.
+  const img = el('img', { alt: '' });
+  img.onerror = () => { img.onerror = null; img.removeAttribute('src'); img.style.visibility = 'hidden'; };
+  if (t.thumb) img.src = t.thumb; else img.style.visibility = 'hidden';
+  return el('li', { className: 'row' }, img, meta, right);
 }
 
 function describe(e) {
