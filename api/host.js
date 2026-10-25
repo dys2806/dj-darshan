@@ -1,7 +1,7 @@
 // /api/host — host only (x-host-pin header).
 // GET  -> status, settings, pending requests, activity log, keepsake playlist status
 // GET ?export=csv -> tonight's picks with dedications as a CSV file
-// POST -> { action: setMode | setExplicit | approve | approveAll | reject | skip | reset }
+// POST -> { action: setMode | approve | approveAll | reject | skip | reset | newKeepsake }
 import { redis, K, isHost, getSettings, updateSettings, logEvent } from '../lib/store.js';
 import { isConnected, sp, friendly } from '../lib/spotify.js';
 import { getNow, bustNow } from '../lib/now.js';
@@ -39,18 +39,13 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') return res.status(405).json({ error: 'GET or POST only' });
 
-  const { action, trackId, mode, blockExplicit } = req.body || {};
+  const { action, trackId, mode } = req.body || {};
   try {
     switch (action) {
       case 'setMode': {
         if (!['auto', 'approve'].includes(mode)) return res.status(400).json({ error: 'mode must be auto or approve' });
         await updateSettings({ mode });
         await logEvent({ type: 'mode', mode });
-        break;
-      }
-      case 'setExplicit': {
-        await updateSettings({ blockExplicit: Boolean(blockExplicit) });
-        await logEvent({ type: 'explicit', blockExplicit: Boolean(blockExplicit) });
         break;
       }
       case 'approve': {

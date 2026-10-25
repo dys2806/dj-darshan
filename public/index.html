@@ -241,17 +241,16 @@ async function search(q) {
     const data = await r.json();
     if (seq !== searchSeq) return;
     if (!r.ok) return toast(data.error || 'Search failed', 'bad');
-    renderResults(data.tracks, data.blockExplicit);
+    renderResults(data.tracks);
   } catch { toast('No connection, try again', 'bad'); }
 }
 
-function renderResults(tracks, blockExplicit) {
+function renderResults(tracks) {
   const list = $('results');
   if (!tracks.length) return list.replaceChildren(el('li', { className: 'empty', textContent: 'No matches.' }));
   list.replaceChildren(...tracks.map((t, i) => {
     const btn = el('button', { className: 'go', textContent: 'Add' });
     if (t.taken) { btn.textContent = 'Requested'; btn.disabled = true; }
-    else if (blockExplicit && t.explicit) { btn.textContent = 'Explicit'; btn.disabled = true; }
     btn.onclick = () => request(t, btn);
     const row = trackRow(t, el('div', { className: 'actions' }, btn), i);
     row.style.animationDelay = `${i * 35}ms`; // results cascade in
@@ -274,7 +273,6 @@ async function request(t, btn) {
     if (data.status === 'queued') { btn.textContent = 'Queued ✓'; toast(`🎆 “${t.name}” is in! ${positionText(data.position)}`.trim(), 'ok'); refreshNow(); }
     else if (data.status === 'pending') { btn.textContent = 'Sent ✓'; toast(`🪔 “${t.name}” sent to ${CFG.djFirstName} for approval.`, 'ok'); refreshNow(); }
     else if (data.status === 'duplicate') { btn.textContent = 'Requested'; toast(data.error, 'warn'); }
-    else if (data.status === 'blocked') { btn.textContent = 'Explicit'; toast(data.error, 'warn'); }
     else { btn.disabled = false; btn.textContent = 'Add'; toast(data.error || 'Couldn’t add that one', 'bad'); }
   } catch {
     btn.disabled = false; btn.textContent = 'Add'; toast('No connection, try again', 'bad');

@@ -1,5 +1,5 @@
 // GET /api/search?q=... — guests search Spotify's catalog (top 10, the dev-mode maximum).
-import { redis, K, getSettings } from '../lib/store.js';
+import { redis, K } from '../lib/store.js';
 import { sp, slimTrack, friendly } from '../lib/spotify.js';
 
 export default async function handler(req, res) {
@@ -7,10 +7,7 @@ export default async function handler(req, res) {
   if (q.length < 2) return res.status(200).json({ tracks: [] });
 
   try {
-    const [data, settings] = await Promise.all([
-      sp('/search', { query: { q, type: 'track', limit: '10' } }),
-      getSettings(),
-    ]);
+    const data = await sp('/search', { query: { q, type: 'track', limit: '10' } });
     const tracks = (data?.tracks?.items || []).filter(Boolean).map(slimTrack);
 
     // Mark songs already requested tonight so the page can grey them out.
@@ -19,7 +16,7 @@ export default async function handler(req, res) {
     tracks.forEach((t, i) => { t.taken = Boolean(taken[i]); });
 
     res.setHeader('Cache-Control', 'no-store');
-    res.status(200).json({ tracks, blockExplicit: settings.blockExplicit });
+    res.status(200).json({ tracks });
   } catch (e) {
     res.status(e.status === 401 ? 503 : 502).json({ error: friendly(e), reason: e.reason });
   }

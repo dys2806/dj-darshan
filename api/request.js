@@ -1,6 +1,7 @@
 // POST /api/request { trackId, guestName, dedication, guestId } — a guest asks for a song.
 // guestId is the random id the guest's phone made up; it lets them see their own requests later.
-// Rules, in order: valid track -> explicit filter -> duplicate guard -> auto-queue or hold for approval.
+// Rules, in order: valid track -> duplicate guard -> auto-queue or hold for approval.
+// Explicit songs are allowed; the host screen warns the host when one is coming up.
 import { redis, K, getSettings, logEvent } from '../lib/store.js';
 import { sp, slimTrack, friendly } from '../lib/spotify.js';
 import { getNow } from '../lib/now.js';
@@ -22,12 +23,8 @@ export default async function handler(req, res) {
   try {
     const settings = await getSettings();
 
-    // Look the track up server-side so the explicit flag can't be faked by the page.
+    // Look the track up server-side so name, artist and explicit flag can't be faked by the page.
     const track = slimTrack(await sp(`/tracks/${trackId}`));
-
-    if (settings.blockExplicit && track.explicit) {
-      return res.status(403).json({ status: 'blocked', error: 'Explicit songs are off tonight. Try a clean version.' });
-    }
 
     // Duplicate guard part 1: already playing or already in Spotify's upcoming queue.
     const now = await getNow().catch(() => null);

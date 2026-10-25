@@ -134,20 +134,19 @@ check('callback stores tokens and returns to /host', r.loc === '/host?connected=
 r = await call('callback', { query: { code: 'xyz', state: loc.searchParams.get('state') } });
 check('state cannot be reused', r.code === 400);
 
-// 3. Auto mode (default) with explicit blocked (default)
+// 3. Auto mode (default)
 r = await guestReq('AAAAAAAAAAAAAAAAAAAAAA', 'Priya', '  For   the hosts 💛 ');
 check('auto mode: clean song queued straight to Spotify', r.body.status === 'queued' && spotifyQueue.includes('AAAAAAAAAAAAAAAAAAAAAA'));
 r = await guestReq('AAAAAAAAAAAAAAAAAAAAAA', 'Rahul');
 check('duplicate blocked', r.code === 409 && r.body.status === 'duplicate');
 r = await guestReq('DDDDDDDDDDDDDDDDDDDDDD');
 check('currently playing song counts as duplicate', r.code === 409);
-r = await guestReq('BBBBBBBBBBBBBBBBBBBBBB');
-check('explicit song blocked', r.code === 403 && r.body.status === 'blocked');
 r = await guestReq('not-a-real-id');
 check('invalid track id rejected', r.code === 400);
 r = await call('search', { query: { q: 'song' } });
 const a = r.body.tracks.find((t) => t.id === 'AAAAAAAAAAAAAAAAAAAAAA');
-check('search marks requested songs as taken + reports explicit setting', a.taken === true && r.body.blockExplicit === true);
+const ex = r.body.tracks.find((t) => t.id === 'BBBBBBBBBBBBBBBBBBBBBB');
+check('search marks requested songs as taken, explicit songs flagged but addable', a.taken === true && ex.explicit === true && ex.taken === false && !('blockExplicit' in r.body));
 db.delete(K.now);
 r = await call('nowplaying');
 check('up next shows who requested', r.body.upNext[0]?.requestedBy === 'Priya' && r.body.current.name === 'Playing Now', JSON.stringify(r.body));
@@ -172,11 +171,21 @@ await call('host', { method: 'POST', headers: host, body: { action: 'reject', tr
 r = await guestReq('CCCCCCCCCCCCCCCCCCCCCC', 'Ankit');
 check('rejected song can be requested again', r.code === 202);
 
-// 6. Explicit toggle off
+// 6. Explicit songs are allowed; the host gets what it needs to warn about them
 await call('host', { method: 'POST', headers: host, body: { action: 'setMode', mode: 'auto' } });
-await call('host', { method: 'POST', headers: host, body: { action: 'setExplicit', blockExplicit: false } });
-r = await guestReq('BBBBBBBBBBBBBBBBBBBBBB');
-check('explicit allowed once host turns filter off', r.body.status === 'queued');
+db.delete(K.now);
+r = await guestReq('BBBBBBBBBBBBBBBBBBBBBB', 'Rahul');
+check('explicit song goes straight into the queue', r.body.status === 'queued' && spotifyQueue.includes('BBBBBBBBBBBBBBBBBBBBBB'));
+r = await call('host', { headers: host });
+const exUp = r.body.now.upNext.find((t) => t.id === 'BBBBBBBBBBBBBBBBBBBBBB');
+check('host screen: explicit song flagged in Up Next with who asked', exUp?.explicit === true && exUp.requestedBy === 'Rahul', JSON.stringify(exUp));
+check('host screen: activity log marks it explicit', r.body.log[0]?.explicit === true && r.body.log[0]?.name === 'Explicit Song');
+check('explicit filter setting is gone', !('blockExplicit' in r.body.settings));
+db.set(K.settings, JSON.stringify({ mode: 'auto', blockExplicit: true }));   // a database from before this change
+r = await call('host', { headers: host });
+check('old saved explicit setting is ignored', JSON.stringify(r.body.settings) === '{"mode":"auto"}', JSON.stringify(r.body.settings));
+r = await call('host', { method: 'POST', headers: host, body: { action: 'setExplicit', blockExplicit: true } });
+check('old explicit toggle action no longer exists', r.code === 400);
 
 // 7. Phone idle in auto mode -> request saved for host instead of lost
 deviceActive = false; db.delete(K.taken); db.delete(K.now); spotifyQueue = [];
@@ -276,7 +285,7 @@ check('position: later it shows "played" and stays that way', r.body.mine[0].sta
 // approval mode: waiting → approved goes into the queue; declined says so
 await call('host', { method: 'POST', headers: host, body: { action: 'setMode', mode: 'approve' } });
 db.delete(K.now);
-await req2('BBBBBBBBBBBBBBBBBBBBBB', G1);      // explicit filter is off from earlier, so this is allowed
+await req2('BBBBBBBBBBBBBBBBBBBBBB', G1);      // explicit songs are allowed
 r = await call('nowplaying', { query: { guest: G1 } });
 check('approve mode: guest sees "waiting"', r.body.mine[0].id === 'BBBBBBBBBBBBBBBBBBBBBB' && r.body.mine[0].status === 'pending');
 await call('host', { method: 'POST', headers: host, body: { action: 'approve', trackId: 'BBBBBBBBBBBBBBBBBBBBBB' } });

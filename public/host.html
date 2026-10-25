@@ -16,6 +16,16 @@
     .log li { padding: 6px 0; border-bottom: 1px solid var(--line); }
     .bar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
     .count { background: var(--warn); color: var(--bg); border-radius: 999px; padding: 0 8px; font-size: 0.8rem; margin-left: 6px; }
+    /* Heads-up when an explicit song is playing or coming up */
+    .explicit-alert { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 12px 14px; border-radius: var(--radius);
+      background: rgba(255, 107, 107, .12); border: 1px solid var(--bad); }
+    .explicit-alert .e { flex: none; width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center;
+      background: var(--bad); color: #fff; font-weight: 800; }
+    .explicit-alert .what { flex: 1; min-width: 0; }
+    .explicit-alert .what b { display: block; }
+    .explicit-alert .what span { color: var(--muted); font-size: .9rem; }
+    .explicit-alert.now { animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse { 50% { box-shadow: 0 0 0 4px rgba(255, 107, 107, .25); } }
   </style>
 </head>
 <body>
@@ -48,6 +58,13 @@
       <button id="skip" title="Same as Next on your phone">Next ⏭</button>
     </div>
 
+    <!-- Shown only when an explicit song is playing or in the queue -->
+    <div class="explicit-alert hidden" id="explicitAlert" role="status">
+      <div class="e">E</div>
+      <div class="what"><b id="exTitle"></b><span id="exDetail"></span></div>
+      <button class="bad hidden" id="exSkip">Next ⏭</button>
+    </div>
+
     <h2>Controls</h2>
     <div class="card">
       <div class="toggle">
@@ -55,13 +72,6 @@
         <div class="seg" id="modeSeg">
           <button data-mode="auto">Auto</button>
           <button data-mode="approve">Approve</button>
-        </div>
-      </div>
-      <div class="toggle">
-        <div><strong>Block explicit</strong></div>
-        <div class="seg" id="explicitSeg">
-          <button data-val="true">On</button>
-          <button data-val="false">Off</button>
         </div>
       </div>
     </div>
@@ -158,19 +168,55 @@ function row(t, right) {
 }
 
 function describe(e) {
-  const song = (e.name ? `“${e.name}”` : 'a song') + (e.dedication ? ` 💌 ${e.dedication}` : '');
+  const song = (e.explicit ? '🅴 ' : '') + (e.name ? `“${e.name}”` : 'a song') + (e.dedication ? ` 💌 ${e.dedication}` : '');
   switch (e.type) {
     case 'queued': return `${e.by} queued ${song}`;
     case 'pending': return `${e.by} requested ${song} (waiting)`;
     case 'approved': return `You approved ${song} from ${e.by}`;
     case 'rejected': return `You declined a request`;
     case 'mode': return `Requests set to ${e.mode === 'auto' ? 'Auto' : 'Approve'}`;
-    case 'explicit': return `Block explicit ${e.blockExplicit ? 'on' : 'off'}`;
     case 'connected': return 'Spotify connected';
     default: return e.type;
   }
 }
 const ago = (ts) => { const m = Math.round((Date.now() - ts) / 60000); return m < 1 ? 'now' : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h`; };
+
+// ---- explicit heads-up --------------------------------------------------------
+// Explicit songs aren't blocked; instead the host gets a warning while one is playing or queued,
+// plus a toast + buzz the first time a new one shows up, so there's time to tap Next.
+const seenExplicit = new Set();
+let firstExplicitCheck = true;
+function explicitHeadsUp(now) {
+  const box = $('explicitAlert');
+  const cur = now?.current;
+  const up = now?.upNext || [];
+  const idx = up.findIndex((t) => t.explicit);
+  const who = (t) => (t.requestedBy ? ` · requested by ${t.requestedBy}` : '');
+
+  if (cur?.explicit) {
+    $('exTitle').textContent = `Explicit song playing now: ${cur.name}`;
+    $('exDetail').textContent = `${cur.artists}${who(cur)} · tap Next to skip it`;
+  } else if (idx >= 0) {
+    const t = up[idx];
+    $('exTitle').textContent = idx === 0 ? `Explicit song plays next: ${t.name}` : `Explicit song coming up in ${idx + 1} songs: ${t.name}`;
+    $('exDetail').textContent = `${t.artists}${who(t)} · tap Next when it starts if you want to skip it`;
+  }
+  const show = Boolean(cur?.explicit) || idx >= 0;
+  box.classList.toggle('hidden', !show);
+  box.classList.toggle('now', Boolean(cur?.explicit));
+  $('exSkip').classList.toggle('hidden', !cur?.explicit);
+
+  // New explicit song spotted since last check: toast + vibrate (not on first load).
+  for (const t of [cur, ...up]) {
+    if (!t?.explicit || seenExplicit.has(t.id)) continue;
+    seenExplicit.add(t.id);
+    if (!firstExplicitCheck) {
+      toast(`🅴 Explicit song added: “${t.name}”${t.requestedBy ? ` by ${t.requestedBy}` : ''}`, 'warn');
+      if (navigator.vibrate) navigator.vibrate([60, 60, 60]);
+    }
+  }
+  firstExplicitCheck = false;
+}
 
 async function refresh() {
   const d = await api('GET');
@@ -183,10 +229,11 @@ async function refresh() {
   $('nowTitle').textContent = d.now?.current?.name || 'Nothing playing';
   $('nowArtist').textContent = d.now?.current?.artists || 'Start a playlist in Spotify on your phone';
   $('nowArt').src = d.now?.current?.image || '';
+  $('nowArt').style.visibility = d.now?.current?.image ? 'visible' : 'hidden'; // no broken-image icon when there's no cover
 
   // Toggles
   for (const b of $('modeSeg').children) b.classList.toggle('on', b.dataset.mode === d.settings.mode);
-  for (const b of $('explicitSeg').children) b.classList.toggle('on', b.dataset.val === String(d.settings.blockExplicit));
+  explicitHeadsUp(d.now);
 
   // Pending approvals
   $('pending').replaceChildren(...(d.pending.length ? d.pending.map((p) => {
@@ -226,7 +273,7 @@ async function refresh() {
 
 // ---- controls ------------------------------------------------------------
 $('modeSeg').onclick = (e) => { const m = e.target.dataset.mode; if (m) act({ action: 'setMode', mode: m }, m === 'auto' ? 'Auto-queue on' : 'Approval mode on'); };
-$('explicitSeg').onclick = (e) => { const v = e.target.dataset.val; if (v) act({ action: 'setExplicit', blockExplicit: v === 'true' }); };
+$('exSkip').onclick = () => act({ action: 'skip' }, 'Skipped');
 $('approveAll').onclick = () => act({ action: 'approveAll' }, 'All approved');
 $('skip').onclick = () => act({ action: 'skip' }, 'Skipped');
 $('reset').onclick = () => { if (confirm('Clear all requests, duplicate memory and the activity log? (The guest-picks keepsake is kept.)')) act({ action: 'reset' }, 'Fresh start'); };

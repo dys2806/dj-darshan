@@ -13,12 +13,13 @@ Built for a Diwali party (marigold garland, diyas, rangoli, fireworks), but ever
 | Page | Who | What it does |
 |---|---|---|
 | `/` | Guests | Search, add a song + dedication, see Now Playing and Up Next with "requested by" |
-| `/host` | You (PIN) | Auto ↔ Approve toggle, explicit filter, approve/decline, Next, keepsake playlist, reset |
+| `/host` | You (PIN) | Auto ↔ Approve toggle, explicit-song heads-up, approve/decline, Next, keepsake playlist, reset |
 | `/tv` | Big screen | Now playing on a spinning record, Up Next, dedications, QR code, fireworks for each new request |
 | `/qr` | Printing | QR poster for the party |
 
-**Every request goes through:** a valid song → explicit filter (checked on the server) → duplicate guard
-(already requested, playing now, or queued) → straight into the queue (**Auto**) or held for you (**Approve**).
+**Every request goes through:** a valid song → duplicate guard (already requested, playing now, or queued)
+→ straight into the queue (**Auto**) or held for you (**Approve**). Explicit songs aren't blocked: the host
+screen shows a red heads-up (plus a buzz) when one is coming up or playing, with a one-tap **Next**.
 If music is paused, requests wait for you instead of being lost.
 
 **Guest picks keepsake:** every guest song is saved to a private Spotify playlist and logged with who asked
@@ -98,7 +99,7 @@ Open `https://YOUR-SITE/host`, enter your PIN, tap **Connect Spotify** and appro
 
 ## Developing
 `npm install && npm test` runs the end-to-end suite offline against a fake Spotify and a fake Redis:
-login security, auto-queue, duplicates, explicit filter, dedications, approval flow, idle-phone fallback,
+login security, auto-queue, duplicates, explicit-song heads-up, dedications, approval flow, idle-phone fallback,
 keepsake playlist, CSV, settings, skip and reset.
 
 Stack: static HTML pages + Vercel serverless functions (`api/`) + Upstash Redis. No framework, no build step.
