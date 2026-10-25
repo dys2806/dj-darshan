@@ -176,7 +176,7 @@ let CFG = { djFirstName: 'the DJ' };
 function applyConfig(c) {
   if (!c || !c.djName) return;
   CFG = c;
-  $('djName').textContent = c.djName;
+  if ($('djName').textContent !== c.djName) { $('djName').textContent = c.djName; Diwali.fitText($('djName')); }
   $('party').textContent = c.partyName;
   $('greeting').textContent = c.greeting;
   $('playsIt').textContent = `${cap(c.djFirstName)} plays it.`;

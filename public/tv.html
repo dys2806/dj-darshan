@@ -222,7 +222,7 @@ function next() {
 async function refresh() {
   try {
     const d = await (await fetch('/api/nowplaying')).json();
-    if (d.djName) $('djName').textContent = d.djName;
+    if (d.djName && $('djName').textContent !== d.djName) { $('djName').textContent = d.djName; Diwali.fitText($('djName')); }
     if (d.partyName) $('party').textContent = d.partyName;
     if (d.queueTitle) $('queueTitle').textContent = d.queueTitle;
     if (d.djFirstName) $('offlineWho').textContent = d.djFirstName.charAt(0).toUpperCase() + d.djFirstName.slice(1);

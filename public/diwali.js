@@ -178,5 +178,23 @@ window.Diwali = (() => {
     img.src = url || art(i);
   }
 
-  return { calm, toran, rangoli, embers, fireworks, diyaDefs, art, setArt };
+  // ---- shrink a big one-line title until it fits its container (long names like "Darshan's Jukebox") ----
+  function fitText(el) {
+    const box = el.closest('h1, .brand, header') || el.parentElement;
+    const fit = () => {
+      el.style.fontSize = '';                                    // start from the CSS size
+      const max = box.clientWidth * 0.96;
+      let size = parseFloat(getComputedStyle(el).fontSize);
+      while (el.getBoundingClientRect().width > max && size > 18) {
+        size -= 1;
+        el.style.fontSize = `${size}px`;
+      }
+    };
+    fit();
+    if (document.fonts?.ready) document.fonts.ready.then(fit);   // re-measure once the display font loads
+    if (!el._fitBound) { el._fitBound = true; addEventListener('resize', fit); }
+    return fit;
+  }
+
+  return { calm, toran, rangoli, embers, fireworks, diyaDefs, art, setArt, fitText };
 })();

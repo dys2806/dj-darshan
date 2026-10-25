@@ -68,7 +68,7 @@ function drawRepoQr(url) {
 }
 fetch('/api/nowplaying').then((r) => r.json()).then((d) => {
   if (d.partyName) document.getElementById('party').textContent = `🪔 ${d.partyName} 🪔`;
-  if (d.djName) document.getElementById('dj').textContent = `with ${d.djName}`;
+  if (d.djName) document.getElementById('dj').textContent = d.djName;
   if (d.queueTitle) { setTitle(d.queueTitle); document.title = d.queueTitle; }
   drawRepoQr(d.repoUrl || 'https://github.com/dys2806/dj-darshan');
 }).catch(() => drawRepoQr('https://github.com/dys2806/dj-darshan'));

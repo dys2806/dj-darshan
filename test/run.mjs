@@ -213,7 +213,10 @@ check('settings: generic defaults when nothing is set', r.body.partyName === 'Di
 Object.assign(process.env, { PARTY_NAME: 'Asha and Raj’s Diwali Party', DJ_NAME: 'DJ Rohan', QUEUE_TITLE: 'Diwali Song Request Queue' });
 r = await call('nowplaying');
 check('settings: party values come from environment', r.body.partyName === 'Asha and Raj’s Diwali Party' && r.body.djFirstName === 'Rohan' && r.body.queueTitle === 'Diwali Song Request Queue');
-for (const k of ['PARTY_NAME', 'DJ_NAME', 'QUEUE_TITLE']) delete process.env[k];
+Object.assign(process.env, { DJ_NAME: 'Rohan’s Jukebox', HOST_NAME: 'Rohan' });
+r = await call('nowplaying');
+check('settings: title without DJ uses HOST_NAME in sentences', r.body.djName === 'Rohan’s Jukebox' && r.body.djFirstName === 'Rohan');
+for (const k of ['PARTY_NAME', 'DJ_NAME', 'QUEUE_TITLE', 'HOST_NAME']) delete process.env[k];
 
 // 9. Keepsake playlist + picks log
 r = await call('host', { headers: host });

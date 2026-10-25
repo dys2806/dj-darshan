@@ -64,7 +64,8 @@ Add any of these under **Settings → Environment Variables**, then redeploy:
 | Setting | Shown as | Default |
 |---|---|---|
 | `PARTY_NAME` | Party title on every page and the keepsake playlist | `Diwali Party` |
-| `DJ_NAME` | The big neon name, e.g. `DJ Rohan` | `DJ` |
+| `DJ_NAME` | The big neon name, e.g. `Rohan's Jukebox` or `DJ Rohan` (auto-shrinks to fit) | `DJ` |
+| `HOST_NAME` | Your name in friendly sentences ("So Rohan knows who picked it"); needed if the big name isn't "DJ …" | from `DJ_NAME` |
 | `QUEUE_TITLE` | Headline on the poster and big screen | `Song Request Queue` |
 | `GREETING` | Chip under the name, e.g. `✨ Shubh Deepavali · requests open all night` | `✨ Requests open all night` |
 | `DEDICATION_EXAMPLE` | Hint in the dedication box | `For our amazing hosts 💛` |
