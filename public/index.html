@@ -49,6 +49,16 @@
     .hint { color: var(--muted); font-size: .82rem; margin: 6px 4px 0; }
     h2 { color: var(--accent); opacity: .85; }
     #results .row { animation: pop .35s ease both; }
+    /* "Your requests": status pill per song */
+    .mine .status { display: inline-block; margin-top: 3px; padding: 2px 9px; border-radius: 999px; font-size: .78rem; font-weight: 700; }
+    .st-playing  { background: var(--accent); color: var(--accent-ink); }
+    .st-next     { background: linear-gradient(135deg, #ffd45c, #ff8a1f); color: var(--accent-ink); }
+    .st-queued   { background: rgba(255, 194, 61, .16); color: var(--accent); }
+    .st-pending  { background: rgba(185, 140, 255, .18); color: #d8c4ff; }
+    .st-played   { background: rgba(255, 255, 255, .08); color: var(--muted); }
+    .st-declined { background: rgba(255, 107, 107, .12); color: #ffb3b3; }
+    .mine .row.is-playing { box-shadow: inset 3px 0 0 var(--accent); padding-left: 8px; }
+    .yours { color: #ffe08a; font-weight: 700; }
     @keyframes pop { from { opacity: 0; transform: translateY(6px); } }
     .row .dedication { font-size: .85rem; }
 
@@ -105,6 +115,12 @@
   <input id="q" type="search" placeholder="Song or artist" autocomplete="off" enterkeyhint="search">
   <ul class="list" id="results"></ul>
 
+  <!-- This phone's own requests, with where each one is in the queue -->
+  <section id="mineBox" class="hidden">
+    <h2>Your requests</h2>
+    <ul class="list mine" id="mine"></ul>
+  </section>
+
   <h2>Up next</h2>
   <ul class="list" id="upnext"><li class="empty">Nothing queued yet.</li></ul>
 
@@ -141,6 +157,18 @@ const store = {
   get: (k) => { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
   set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
 };
+
+// ---- anonymous id for this phone, so the guest can see their own requests (no login, no name needed) ----
+const GUEST = (() => {
+  let g = store.get('dj-guest');
+  if (!/^[a-z0-9]{16,40}$/.test(g)) {
+    const bytes = new Uint8Array(12);
+    crypto.getRandomValues(bytes);
+    g = [...bytes].map((b) => b.toString(36).padStart(2, '0')).join('').slice(0, 24);
+    store.set('dj-guest', g);
+  }
+  return g;
+})();
 
 // ---- party settings (names, titles) come from the server; last copy is remembered so the page paints instantly ----
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -185,7 +213,8 @@ function trackRow(t, right, i) {
   if (t.explicit) name.append(el('span', { className: 'badge', textContent: 'E' }));
   name.append(t.name);
   const meta = el('div', { className: 'meta' }, name, el('div', { className: 'artist', textContent: t.artists }));
-  if (t.requestedBy) meta.append(el('div', { className: 'chip', textContent: `🪔 requested by ${t.requestedBy}` }));
+  if (t.yours) meta.append(el('div', { className: 'chip yours', textContent: '⭐ Your pick' }));
+  else if (t.requestedBy) meta.append(el('div', { className: 'chip', textContent: `🪔 requested by ${t.requestedBy}` }));
   if (t.dedication) meta.append(el('div', { className: 'dedication', textContent: `💌 “${t.dedication}”` }));
   const img = el('img', { alt: '', loading: 'lazy' });
   Diwali.setArt(img, t.thumb, i);
@@ -237,13 +266,13 @@ async function request(t, btn) {
     const r = await fetch('/api/request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ trackId: t.id, guestName: $('name').value.trim(), dedication: $('dedication').value.trim() }),
+      body: JSON.stringify({ trackId: t.id, guestName: $('name').value.trim(), dedication: $('dedication').value.trim(), guestId: GUEST }),
     });
     const data = await r.json();
     const ok = data.status === 'queued' || data.status === 'pending';
     if (ok) { celebrate(btn); $('dedication').value = ''; } // a dedication goes with one song only
-    if (data.status === 'queued') { btn.textContent = 'Queued ✓'; toast(`🎆 “${t.name}” is in the queue!`, 'ok'); refreshNow(); }
-    else if (data.status === 'pending') { btn.textContent = 'Sent ✓'; toast(`🪔 “${t.name}” sent to ${CFG.djFirstName} for approval.`, 'ok'); }
+    if (data.status === 'queued') { btn.textContent = 'Queued ✓'; toast(`🎆 “${t.name}” is in! ${positionText(data.position)}`.trim(), 'ok'); refreshNow(); }
+    else if (data.status === 'pending') { btn.textContent = 'Sent ✓'; toast(`🪔 “${t.name}” sent to ${CFG.djFirstName} for approval.`, 'ok'); refreshNow(); }
     else if (data.status === 'duplicate') { btn.textContent = 'Requested'; toast(data.error, 'warn'); }
     else if (data.status === 'blocked') { btn.textContent = 'Explicit'; toast(data.error, 'warn'); }
     else { btn.disabled = false; btn.textContent = 'Add'; toast(data.error || 'Couldn’t add that one', 'bad'); }
@@ -252,10 +281,44 @@ async function request(t, btn) {
   }
 }
 
+// ---- "Your requests" -----------------------------------------------------------
+// Where a song is: "Plays next!", "Plays after 3 songs", or just "In the queue" if Spotify hasn't said.
+function positionText(p) {
+  if (!p) return '';
+  if (p.status === 'playing') return 'Playing now 🎶';
+  if (p.status !== 'queued') return '';
+  if (p.ahead === 0) return 'Plays next! 🎉';
+  if (p.ahead > 0) return `Plays after ${p.ahead} song${p.ahead === 1 ? '' : 's'}`;
+  return 'In the queue';
+}
+function statusPill(p) {
+  switch (p.status) {
+    case 'playing':  return ['st-playing', '🎶 Playing now'];
+    case 'queued':   return p.ahead === 0 ? ['st-next', '⏭ Plays next!'] : ['st-queued', `⏳ ${positionText(p)}`];
+    case 'pending':  return ['st-pending', `✋ Waiting for ${CFG.djFirstName}’s OK`];
+    case 'declined': return ['st-declined', 'Not this time, try another'];
+    default:         return ['st-played', '✓ Played'];
+  }
+}
+function renderMine(list) {
+  $('mineBox').classList.toggle('hidden', !list.length);
+  $('mine').replaceChildren(...list.map((p, i) => {
+    const [cls, label] = statusPill(p);
+    const meta = el('div', { className: 'meta' },
+      el('div', { className: 'name', textContent: p.name }),
+      el('div', { className: 'artist', textContent: p.artists }),
+      el('span', { className: `status ${cls}`, textContent: label }));
+    if (p.dedication) meta.append(el('div', { className: 'dedication', textContent: `💌 “${p.dedication}”` }));
+    const img = el('img', { alt: '', loading: 'lazy' });
+    Diwali.setArt(img, p.thumb, i + 5);
+    return el('li', { className: `row${p.status === 'playing' ? ' is-playing' : ''}` }, img, meta);
+  }));
+}
+
 // ---- now playing + up next (polled) ---------------------------------------
 async function refreshNow() {
   try {
-    const d = await (await fetch('/api/nowplaying')).json();
+    const d = await (await fetch(`/api/nowplaying?guest=${GUEST}`)).json();
     applyConfig(d);
     store.set('dj-config', JSON.stringify({ partyName: d.partyName, djName: d.djName, djFirstName: d.djFirstName, greeting: d.greeting, dedicationExample: d.dedicationExample, repoUrl: d.repoUrl }));
     document.body.classList.toggle('music-on', Boolean(d.current)); // record spins, EQ + name dance with music
@@ -268,6 +331,11 @@ async function refreshNow() {
     $('nowDedication').textContent = d.current?.dedication ? `💌 “${d.current.dedication}”` : '';
     $('nowDedication').classList.toggle('hidden', !d.current?.dedication);
     Diwali.setArt($('nowArt'), d.current?.image, 0);
+
+    // This guest's own requests, newest first, with live status.
+    renderMine(d.mine || []);
+    const mineIds = new Set((d.mine || []).map((p) => p.id));
+    for (const t of d.upNext || []) if (mineIds.has(t.id)) t.yours = true;
 
     // Guests see only the next 5 songs (the big screen and host screen show more).
     const UP_NEXT_LIMIT = 5;

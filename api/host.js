@@ -8,6 +8,7 @@ import { getNow, bustNow } from '../lib/now.js';
 import { sendToSpotify } from '../lib/queue.js';
 import { keepsakeStatus, picksCsv } from '../lib/keepsake.js';
 import { partyConfig } from '../lib/config.js';
+import { setPickStatus, clearGuests } from '../lib/guests.js';
 
 // Pending requests, oldest first (first come, first served).
 async function pendingList() {
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
     ]);
     let now = null, playerError = null;
     if (connected) {
-      try { now = await getNow(); } catch (e) { playerError = friendly(e); }
+      try { now = await getNow(); now = { ...now, upNext: now.upNext.slice(0, 10) }; } catch (e) { playerError = friendly(e); }
     }
     return res.status(200).json({ connected, settings, pending, log, now, playerError, keepsake, config: partyConfig() });
   }
@@ -64,6 +65,8 @@ export default async function handler(req, res) {
         break;
       }
       case 'reject': {
+        const entry = await redis.hget(K.pending, String(trackId));
+        if (entry?.guestId) await setPickStatus(entry.guestId, String(trackId), 'declined'); // guest sees "not this time"
         await redis.hdel(K.pending, String(trackId));
         await redis.srem(K.taken, String(trackId)); // someone else may request it later
         await logEvent({ type: 'rejected', id: trackId });
@@ -83,6 +86,7 @@ export default async function handler(req, res) {
         // For the next party: forget tonight's picks log and start a new playlist on the next request.
         // The old playlist stays in Spotify.
         await redis.del(K.picks, K.keepsake, K.keepsakeLock, K.keepsakeError);
+        await clearGuests(); // guests' request histories start fresh too
         break;
       }
       default:

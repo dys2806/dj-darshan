@@ -27,6 +27,8 @@ function run([cmd, ...a]) {
     }
     case 'rpush': for (const v of a.slice(1)) L().push(String(v)); return L().length;
     case 'llen': return (db.get(k) || []).length;
+    case 'expire': return db.has(k) ? 1 : 0;
+    case 'smembers': return [...(db.get(k) || [])];
     case 'del': return a.filter((x) => db.delete(x)).length;
     case 'getdel': { const v = db.get(k) ?? null; db.delete(k); return v; }
     case 'hgetall': { const h = db.get(k); return h ? [...h].flat() : []; }
@@ -67,6 +69,7 @@ const mk = (id) => ({ id, uri: `spotify:track:${id}`, name: tracks[id].name, exp
   artists: [{ name: 'Artist' }], album: { images: [{ url: 'big' }, { url: 'mid' }, { url: 'small' }] }, duration_ms: 1000 });
 let spotifyQueue = [];
 let deviceActive = true;
+let currentId = 'DDDDDDDDDDDDDDDDDDDDDD';
 let grantedScope = 'user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-modify-private playlist-modify-public';
 let playlistsCreated = 0, playlistDown = false;
 const playlistItems = [];
@@ -89,12 +92,12 @@ globalThis.fetch = async (url, opts = {}) => {
   }
   if (u.pathname === '/v1/search') return json(200, { tracks: { items: Object.keys(tracks).map(mk) } });
   if (u.pathname.startsWith('/v1/tracks/')) return json(200, mk(u.pathname.split('/').pop()));
-  if (u.pathname === '/v1/me/player/queue' && m === 'GET') return json(200, { currently_playing: mk('DDDDDDDDDDDDDDDDDDDDDD'), queue: spotifyQueue.map(mk) });
+  if (u.pathname === '/v1/me/player/queue' && m === 'GET') return json(200, { currently_playing: mk(currentId), queue: spotifyQueue.map(mk) });
   if (u.pathname === '/v1/me/player/queue' && m === 'POST') {
     if (!deviceActive) return json(404, { error: { status: 404, message: 'Player command failed: No active device found', reason: 'NO_ACTIVE_DEVICE' } });
     spotifyQueue.push(u.searchParams.get('uri').split(':').pop()); return json(200, null);
   }
-  if (u.pathname === '/v1/me/player/next') { spotifyQueue.shift(); return json(200, null); }
+  if (u.pathname === '/v1/me/player/next') { const n = spotifyQueue.shift(); if (n) currentId = n; return json(200, null); }
   return json(404, {});
 };
 
@@ -191,6 +194,7 @@ check('approve all works once music resumes', r.code === 200 && spotifyQueue.inc
 const before = spotifyQueue.length;
 r = await call('host', { method: 'POST', headers: host, body: { action: 'skip' } });
 check('skip calls Spotify next', r.code === 200 && calls.includes('POST /v1/me/player/next') && spotifyQueue.length === before - 1);
+currentId = 'DDDDDDDDDDDDDDDDDDDDDD'; db.delete(K.now); // put the original song back on for the later tests
 await call('host', { method: 'POST', headers: host, body: { action: 'reset' } });
 check('reset clears requests but keeps Spotify login', !db.has(K.taken) && !db.has(K.log) && peek(K.refresh) === 'RT');
 
@@ -235,6 +239,60 @@ const created = playlistsCreated;
 await Promise.all([guestReq('AAAAAAAAAAAAAAAAAAAAAA', 'X'), guestReq('CCCCCCCCCCCCCCCCCCCCCC', 'Y')]);
 r = await call('host', { headers: host });
 check('keepsake: new party starts fresh, simultaneous requests share one playlist', playlistsCreated === created + 1 && r.body.keepsake.count === 2 && r.body.keepsake.url.endsWith('PL' + playlistsCreated), JSON.stringify({ created, playlistsCreated, k: r.body.keepsake }));
+
+// 10. Each guest's own requests + where their song is in the queue
+await call('host', { method: 'POST', headers: host, body: { action: 'reset' } });
+await call('host', { method: 'POST', headers: host, body: { action: 'setMode', mode: 'auto' } });
+spotifyQueue = ['DDDDDDDDDDDDDDDDDDDDDD']; currentId = 'DDDDDDDDDDDDDDDDDDDDDD'; db.delete(K.now);
+spotifyQueue = []; db.delete(K.now);
+const G1 = 'guestone1234567890ab', G2 = 'guesttwo1234567890ab';
+const req2 = (id, guestId, name = 'Priya') => call('request', { method: 'POST', body: { trackId: id, guestName: name, guestId } });
+await req2('AAAAAAAAAAAAAAAAAAAAAA', G2, 'Rahul');                // someone else's song first
+r = await req2('CCCCCCCCCCCCCCCCCCCCCC', G1);
+check('position: guest told how many songs are ahead', r.body.status === 'queued' && r.body.position?.ahead === 1 && !('aheadMs' in r.body.position), JSON.stringify(r.body.position));
+r = await call('nowplaying', { query: { guest: G1 } });
+check('position: guest sees own request with live status', r.body.mine?.length === 1 && r.body.mine[0].id === 'CCCCCCCCCCCCCCCCCCCCCC' && r.body.mine[0].status === 'queued' && r.body.mine[0].ahead === 1, JSON.stringify(r.body.mine));
+check('privacy: guest never sees another guest’s requests', !r.body.mine.some((p) => p.id === 'AAAAAAAAAAAAAAAAAAAAAA'));
+r = await call('nowplaying', { query: { guest: 'bad id!' } });
+check('privacy: invalid guest id gets no history', r.body.mine === undefined);
+r = await call('nowplaying');
+check('no guest id: page still works, no history field', r.body.connected && r.body.mine === undefined && r.body.upNext.length <= 10);
+
+// Rahul's song plays, then Priya's is next, then hers plays
+await call('host', { method: 'POST', headers: host, body: { action: 'skip' } }); db.delete(K.now);
+r = await call('nowplaying', { query: { guest: G1 } });
+check('position: counts down to "plays next"', r.body.mine[0].status === 'queued' && r.body.mine[0].ahead === 0, JSON.stringify(r.body.mine[0]));
+await call('host', { method: 'POST', headers: host, body: { action: 'skip' } }); db.delete(K.now);
+r = await call('nowplaying', { query: { guest: G1 } });
+check('position: shows "playing now" when it’s on', r.body.mine[0].status === 'playing');
+currentId = 'DDDDDDDDDDDDDDDDDDDDDD'; db.delete(K.now);
+r = await call('nowplaying', { query: { guest: G1 } });
+check('position: just-finished song waits out the grace period (no false "played")', r.body.mine[0].status === 'queued' && r.body.mine[0].ahead === null);
+const realNow = Date.now; Date.now = () => realNow() + 5 * 60 * 1000; db.delete(K.now);
+r = await call('nowplaying', { query: { guest: G1 } });
+Date.now = realNow;
+check('position: later it shows "played" and stays that way', r.body.mine[0].status === 'played' && JSON.parse(peek(K.guest(G1)).get('CCCCCCCCCCCCCCCCCCCCCC')).status === 'played');
+
+// approval mode: waiting → approved goes into the queue; declined says so
+await call('host', { method: 'POST', headers: host, body: { action: 'setMode', mode: 'approve' } });
+db.delete(K.now);
+await req2('BBBBBBBBBBBBBBBBBBBBBB', G1);      // explicit filter is off from earlier, so this is allowed
+r = await call('nowplaying', { query: { guest: G1 } });
+check('approve mode: guest sees "waiting"', r.body.mine[0].id === 'BBBBBBBBBBBBBBBBBBBBBB' && r.body.mine[0].status === 'pending');
+await call('host', { method: 'POST', headers: host, body: { action: 'approve', trackId: 'BBBBBBBBBBBBBBBBBBBBBB' } });
+r = await call('nowplaying', { query: { guest: G1 } });
+check('approve mode: approved song shows its place in the queue', r.body.mine[0].status === 'queued' && r.body.mine[0].ahead === 0, JSON.stringify(r.body.mine[0]));
+await call('host', { method: 'POST', headers: host, body: { action: 'reset' } });
+await req2('AAAAAAAAAAAAAAAAAAAAAA', G1);
+await call('host', { method: 'POST', headers: host, body: { action: 'reject', trackId: 'AAAAAAAAAAAAAAAAAAAAAA' } });
+r = await call('nowplaying', { query: { guest: G1 } });
+check('approve mode: declined request says so', r.body.mine.find((p) => p.id === 'AAAAAAAAAAAAAAAAAAAAAA')?.status === 'declined');
+check('history: newest request first, older ones kept', r.body.mine.length === 3 && r.body.mine[0].id === 'AAAAAAAAAAAAAAAAAAAAAA');
+
+// new party clears everyone's history
+await call('host', { method: 'POST', headers: host, body: { action: 'newKeepsake' } });
+r = await call('nowplaying', { query: { guest: G1 } });
+check('new party: guest histories start fresh', r.body.mine.length === 0);
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');
 process.exit(fails ? 1 : 0);
