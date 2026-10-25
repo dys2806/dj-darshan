@@ -269,9 +269,11 @@ async function refreshNow() {
     $('nowDedication').classList.toggle('hidden', !d.current?.dedication);
     Diwali.setArt($('nowArt'), d.current?.image, 0);
 
+    // Guests see only the next 5 songs (the big screen and host screen show more).
+    const UP_NEXT_LIMIT = 5;
     const up = $('upnext');
     up.replaceChildren(...(d.upNext?.length
-      ? d.upNext.map((t, i) => trackRow(t, null, i + 3))
+      ? d.upNext.slice(0, UP_NEXT_LIMIT).map((t, i) => trackRow(t, null, i + 3))
       : [el('li', { className: 'empty', textContent: 'Nothing queued yet.' })]));
   } catch { /* keep the last good view */ }
 }
