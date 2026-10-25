@@ -10,6 +10,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Yatra+One&display=swap" rel="stylesheet">
   <!-- QR generator; the code always points at whatever address this site is deployed to -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+  <script src="/diya-qr.js"></script>
   <style>
     :root { --bg: #14081f; --text: #fff6ea; --muted: #c9b2d3; --accent: #ffc23d; }
     body { text-align: center; padding-top: 36px; background: radial-gradient(120% 80% at 50% 0%, #2a0f3d 0%, #14081f 60%); min-height: 100vh; }
@@ -17,8 +19,9 @@
     .title { font-family: "Bricolage Grotesque", system-ui, sans-serif; font-weight: 800; font-size: 2.6rem;
       line-height: 1.05; letter-spacing: -.02em; margin: 10px 0 4px; }
     .dj { font-weight: 700; color: var(--accent); letter-spacing: .14em; text-transform: uppercase; font-size: .9rem; }
-    #qr { display: inline-block; padding: 18px; background: #fff; border-radius: 20px; margin: 22px 0 14px; }
-    #qr img, #qr canvas { display: block; width: 300px; height: 300px; }
+    #qr { display: inline-block; margin: 18px 0 10px; }
+    #qr svg { display: block; width: 330px; height: auto; filter: drop-shadow(0 10px 30px rgba(255, 120, 30, .35)); }
+    @media print { #qr svg { filter: none; } }
     .steps { color: var(--muted); font-size: 1.05rem; }
     .steps b { color: var(--text); }
     .getit { display: inline-flex; align-items: center; gap: 8px; margin-top: 26px; color: var(--muted); font-size: .72rem; text-align: left; line-height: 1.3; opacity: .8; }
@@ -48,11 +51,7 @@
 
 <script>
 // The QR code opens the guest page on this same site. The address itself isn't printed.
-new QRCode(document.getElementById('qr'), {
-  text: location.origin + '/', width: 600, height: 600,   // drawn large, shown at 300px for crisp printing
-  colorDark: '#000000', colorLight: '#ffffff',
-  correctLevel: QRCode.CorrectLevel.M,
-});
+DiyaQR.render(document.getElementById('qr'), location.origin + '/');
 // Headline split over two lines on the last two words ("Diwali Song / Request Queue").
 function setTitle(t) {
   const words = t.split(' '), el = document.getElementById('queueTitle');

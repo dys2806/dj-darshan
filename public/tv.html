@@ -11,6 +11,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Yatra+One&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+  <script src="/diya-qr.js"></script>
   <style>
     /* Big screen: TV or laptop, landscape. Everything sized from the screen so it scales to any display. */
     html, body { height: 100%; }
@@ -63,8 +65,8 @@
     .upnext .empty { color: var(--muted); font-size: 2.2vmin; padding: 1vmin 0; }
 
     .qrbox { display: flex; align-items: center; gap: 2.4vmin; }
-    #qr { background: #fff; padding: 1.2vmin; border-radius: 1.4vmin; flex: none; }
-    #qr img, #qr canvas { display: block; width: 17vmin !important; height: 17vmin !important; }
+    #qr { flex: none; }
+    #qr svg { display: block; height: 30vmin; width: auto; filter: drop-shadow(0 1vmin 3vmin rgba(255, 120, 30, .35)); }
     .qrtext .big { font-family: "Bricolage Grotesque", system-ui, sans-serif; font-weight: 800; font-size: 3.6vmin; line-height: 1.05; }
     .qrtext .small { color: var(--muted); font-size: 1.9vmin; margin-top: .8vmin; }
     .qrtext .url { color: var(--accent); font-size: 1.9vmin; margin-top: .6vmin; word-break: break-all; }
@@ -171,7 +173,7 @@ fx.ambient(4500, 1.6); // bigger, more frequent fireworks on a big screen
 
 // ---- QR code pointing at the guest page ----------------------------------------
 const target = location.origin + '/';
-new QRCode($('qr'), { text: target, width: 512, height: 512, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+DiyaQR.render($('qr'), target);
 
 // Small QR to the GitHub repo, drawn once we know the address from the settings.
 let repoQrFor = null;
