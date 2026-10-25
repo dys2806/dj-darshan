@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#14081f">
+  <title>DJ Darshan · Request a Song</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/diwali.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Yatra+One&display=swap" rel="stylesheet">
+  <style>
+    body { padding-top: 64px; }
+
+    /* ---- hero ---- */
+    .hero { position: relative; text-align: center; padding: 4px 0 6px; isolation: isolate; }
+    .hero .rangoli { position: absolute; left: 50%; top: -6px; width: 360px; height: 360px; margin-left: -180px;
+      opacity: .26; z-index: -1; pointer-events: none; }
+    .hero::after { /* soft dark centre so text stays readable over the rangoli */
+      content: ""; position: absolute; left: 50%; top: 40px; width: 300px; height: 260px; margin-left: -150px; z-index: -1;
+      background: radial-gradient(closest-side, rgba(20, 8, 31, .7), transparent); pointer-events: none; }
+    .partyline { display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .partyline .party { font-size: 1.3rem; max-width: 250px; }
+    .onair { margin-top: 14px; }
+    .djname { font-size: clamp(2.8rem, 15vw, 5.6rem); margin: 8px 0 6px; }
+    .tagline { font-size: 1.05rem; margin: 2px 0 0; text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+    .tagline b { color: var(--accent); }
+    .partychip { display: inline-block; margin-top: 12px; padding: 6px 14px; border-radius: 999px;
+      border: 1px solid rgba(255, 194, 61, .35); background: rgba(20, 8, 31, .55); font-weight: 600; font-size: .9rem; }
+    .howto { display: flex; justify-content: center; gap: 18px; margin: 16px 0 0; color: var(--muted); font-size: .85rem; }
+    .howto b { color: var(--accent); }
+
+    /* ---- now playing card with a rotating rainbow border ---- */
+    @property --ang { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+    .stage { margin-top: 22px; border: 1.5px solid transparent;
+      background: linear-gradient(rgba(34, 16, 48, .9), rgba(34, 16, 48, .9)) padding-box,
+                  conic-gradient(from var(--ang), var(--accent), var(--pink), var(--violet), var(--saffron), var(--accent)) border-box;
+      box-shadow: 0 10px 40px rgba(255, 90, 40, .15); animation: ring 6s linear infinite; }
+    @keyframes ring { to { --ang: 360deg; } }
+    .stage .vinyl { width: 84px; height: 84px; }
+    .stage .eyebrow { display: flex; align-items: center; }
+
+    /* ---- inputs, buttons, lists ---- */
+    button.go:not(:disabled) { background: linear-gradient(135deg, #ffd45c, #ff8a1f); color: var(--accent-ink);
+      box-shadow: 0 4px 16px rgba(255, 140, 30, .35); }
+    button.go:not(:disabled):active { transform: scale(.94); }
+    input[type=text], input[type=search] { background: rgba(34, 16, 48, .88); }
+    .hint { color: var(--muted); font-size: .82rem; margin: 6px 4px 0; }
+    h2 { color: var(--accent); opacity: .85; }
+    #results .row { animation: pop .35s ease both; }
+    @keyframes pop { from { opacity: 0; transform: translateY(6px); } }
+    .row .dedication { font-size: .85rem; }
+
+    @media (prefers-reduced-motion: reduce) { .stage, #results .row { animation: none !important; } }
+  </style>
+</head>
+<body>
+  <!-- Background layers: night sky, drifting glows, rising embers, fireworks -->
+  <div class="sky" aria-hidden="true"></div>
+  <div class="glow" aria-hidden="true"><span></span><span></span><span></span></div>
+  <div class="embers" id="embers" aria-hidden="true"></div>
+  <canvas class="fx" id="fx" aria-hidden="true"></canvas>
+  <div class="toran" id="toran" aria-hidden="true"></div>
+
+  <!-- Guest page: what people land on after scanning the QR code. -->
+  <header class="hero">
+    <svg class="rangoli" id="rangoli" aria-hidden="true"></svg>
+    <div class="partyline">
+      <svg class="diya" viewBox="0 0 40 44" aria-hidden="true"><use href="#diya"/></svg>
+      <div class="party" id="party">Himanshu and Kirti’s Diwali Party</div>
+      <svg class="diya" viewBox="0 0 40 44" aria-hidden="true"><use href="#diya"/></svg>
+    </div>
+    <div class="onair">ON AIR</div>
+    <h1><span class="djwrap"><span class="djname" id="djName">DJ Darshan</span></span></h1>
+    <p class="tagline">You pick the song. <b>He plays it.</b></p>
+    <div class="partychip">✨ Shubh Deepavali · requests open all night</div>
+    <div class="howto"><span><b>1</b> Search</span><span><b>2</b> Tap Add</span><span><b>3</b> Dance</span></div>
+  </header>
+
+  <div id="offline" class="banner hidden">Darshan hasn’t connected Spotify yet. Requests open soon.</div>
+
+  <!-- Now playing -->
+  <div class="card now stage" id="stage">
+    <div class="vinyl"><img id="nowArt" alt=""></div>
+    <div style="min-width:0">
+      <div class="eyebrow"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Now playing</div>
+      <div class="title" id="nowTitle">Nothing yet</div>
+      <div class="artist" id="nowArtist" style="color:var(--muted)"></div>
+      <div class="dedication hidden" id="nowDedication"></div>
+    </div>
+  </div>
+
+  <h2>Your name</h2>
+  <input id="name" type="text" maxlength="30" placeholder="So Darshan knows who picked it (optional)" autocomplete="nickname">
+
+  <h2>Dedicate it 💌</h2>
+  <input id="dedication" type="text" maxlength="60" placeholder="e.g. For Kirti, the best host ever (optional)" autocomplete="off">
+  <p class="hint">Shows next to your song in Up Next and on the big screen.</p>
+
+  <h2>Find a song</h2>
+  <input id="q" type="search" placeholder="Song or artist" autocomplete="off" enterkeyhint="search">
+  <ul class="list" id="results"></ul>
+
+  <h2>Up next</h2>
+  <ul class="list" id="upnext"><li class="empty">Nothing queued yet.</li></ul>
+
+  <div class="toast" id="toast"></div>
+
+<script src="/diwali.js"></script>
+<script>
+// ---- tiny helpers ---------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+
+// Build elements with textContent only, so a guest typing <script> can't break the page.
+function el(tag, props = {}, ...kids) {
+  const n = document.createElement(tag);
+  Object.assign(n, props);
+  for (const k of kids) if (k != null) n.append(k);
+  return n;
+}
+
+// Bottom-of-screen message: kind = ok | warn | bad.
+let toastTimer;
+function toast(msg, kind = 'ok') {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = `toast show ${kind}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.className = 'toast'), 3500);
+}
+
+// localStorage can throw in private mode; never let that break requests.
+const store = {
+  get: (k) => { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+};
+
+// ---- decorations ------------------------------------------------------------
+Diwali.diyaDefs();
+Diwali.toran($('toran'));
+Diwali.rangoli($('rangoli'));
+Diwali.embers($('embers'));
+const fx = Diwali.fireworks($('fx'));
+if (!Diwali.calm) {
+  setTimeout(() => { fx.burst(innerWidth * .25, 130, 60); setTimeout(() => fx.burst(innerWidth * .75, 100, 60), 450); }, 600);
+  fx.ambient(6500);
+}
+
+// Celebrate a request: a big burst right where the guest tapped.
+function celebrate(btn) {
+  const r = btn.getBoundingClientRect();
+  fx.burst(r.left + r.width / 2, r.top + r.height / 2, 110);
+  setTimeout(() => fx.burst(innerWidth / 2, 150, 80), 250);
+  if (navigator.vibrate) navigator.vibrate(30); // tiny buzz on Android
+}
+
+// One list row: art (or a music tile), title, artist, who asked, dedication.
+function trackRow(t, right, i) {
+  const name = el('div', { className: 'name' });
+  if (t.explicit) name.append(el('span', { className: 'badge', textContent: 'E' }));
+  name.append(t.name);
+  const meta = el('div', { className: 'meta' }, name, el('div', { className: 'artist', textContent: t.artists }));
+  if (t.requestedBy) meta.append(el('div', { className: 'chip', textContent: `🪔 requested by ${t.requestedBy}` }));
+  if (t.dedication) meta.append(el('div', { className: 'dedication', textContent: `💌 “${t.dedication}”` }));
+  const img = el('img', { alt: '', loading: 'lazy' });
+  Diwali.setArt(img, t.thumb, i);
+  return el('li', { className: 'row' }, img, meta, right);
+}
+
+// ---- remembered name ---------------------------------------------------------
+$('name').value = store.get('dj-name');
+$('name').addEventListener('input', (e) => store.set('dj-name', e.target.value.trim()));
+
+// ---- search (debounced so we don't hit Spotify on every keystroke) --------
+let searchTimer, searchSeq = 0;
+$('q').addEventListener('input', (e) => {
+  clearTimeout(searchTimer);
+  const q = e.target.value.trim();
+  if (q.length < 2) { $('results').replaceChildren(); return; }
+  searchTimer = setTimeout(() => search(q), 350);
+});
+
+async function search(q) {
+  const seq = ++searchSeq; // ignore stale responses if the guest kept typing
+  try {
+    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const data = await r.json();
+    if (seq !== searchSeq) return;
+    if (!r.ok) return toast(data.error || 'Search failed', 'bad');
+    renderResults(data.tracks, data.blockExplicit);
+  } catch { toast('No connection, try again', 'bad'); }
+}
+
+function renderResults(tracks, blockExplicit) {
+  const list = $('results');
+  if (!tracks.length) return list.replaceChildren(el('li', { className: 'empty', textContent: 'No matches.' }));
+  list.replaceChildren(...tracks.map((t, i) => {
+    const btn = el('button', { className: 'go', textContent: 'Add' });
+    if (t.taken) { btn.textContent = 'Requested'; btn.disabled = true; }
+    else if (blockExplicit && t.explicit) { btn.textContent = 'Explicit'; btn.disabled = true; }
+    btn.onclick = () => request(t, btn);
+    const row = trackRow(t, el('div', { className: 'actions' }, btn), i);
+    row.style.animationDelay = `${i * 35}ms`; // results cascade in
+    return row;
+  }));
+}
+
+// ---- request a song -------------------------------------------------------
+async function request(t, btn) {
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const r = await fetch('/api/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trackId: t.id, guestName: $('name').value.trim(), dedication: $('dedication').value.trim() }),
+    });
+    const data = await r.json();
+    const ok = data.status === 'queued' || data.status === 'pending';
+    if (ok) { celebrate(btn); $('dedication').value = ''; } // a dedication goes with one song only
+    if (data.status === 'queued') { btn.textContent = 'Queued ✓'; toast(`🎆 “${t.name}” is in the queue!`, 'ok'); refreshNow(); }
+    else if (data.status === 'pending') { btn.textContent = 'Sent ✓'; toast(`🪔 “${t.name}” sent to Darshan for approval.`, 'ok'); }
+    else if (data.status === 'duplicate') { btn.textContent = 'Requested'; toast(data.error, 'warn'); }
+    else if (data.status === 'blocked') { btn.textContent = 'Explicit'; toast(data.error, 'warn'); }
+    else { btn.disabled = false; btn.textContent = 'Add'; toast(data.error || 'Couldn’t add that one', 'bad'); }
+  } catch {
+    btn.disabled = false; btn.textContent = 'Add'; toast('No connection, try again', 'bad');
+  }
+}
+
+// ---- now playing + up next (polled) ---------------------------------------
+async function refreshNow() {
+  try {
+    const d = await (await fetch('/api/nowplaying')).json();
+    if (d.djName) $('djName').textContent = d.djName;
+    if (d.partyName) $('party').textContent = d.partyName;
+    document.title = `${d.djName || 'DJ'} · ${d.partyName || 'Request a Song'}`;
+    document.body.classList.toggle('music-on', Boolean(d.current)); // record spins, EQ + name dance with music
+    $('offline').classList.toggle('hidden', d.connected);
+
+    $('nowTitle').textContent = d.current?.name || 'Nothing playing';
+    $('nowArtist').textContent = d.current
+      ? d.current.artists + (d.current.requestedBy ? ` · 🪔 ${d.current.requestedBy}` : '')
+      : '';
+    $('nowDedication').textContent = d.current?.dedication ? `💌 “${d.current.dedication}”` : '';
+    $('nowDedication').classList.toggle('hidden', !d.current?.dedication);
+    Diwali.setArt($('nowArt'), d.current?.image, 0);
+
+    const up = $('upnext');
+    up.replaceChildren(...(d.upNext?.length
+      ? d.upNext.map((t, i) => trackRow(t, null, i + 3))
+      : [el('li', { className: 'empty', textContent: 'Nothing queued yet.' })]));
+  } catch { /* keep the last good view */ }
+}
+refreshNow();
+setInterval(() => { if (!document.hidden) refreshNow(); }, 15000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshNow(); });
+</script>
+</body>
+</html>

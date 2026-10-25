@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>DJ Darshan · Big Screen</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/diwali.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Yatra+One&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    /* Big screen: TV or laptop, landscape. Everything sized from the screen so it scales to any display. */
+    html, body { height: 100%; }
+    body { max-width: none; margin: 0; padding: 0; overflow: hidden; font-size: 1.6vmin; }
+    body.idle { cursor: none; }
+
+    /* blurred album art washing the background */
+    .backdrop { position: fixed; inset: -10%; z-index: -2; background-size: cover; background-position: center;
+      filter: blur(60px) saturate(1.4); opacity: .32; transition: background-image 1s; }
+
+    .screen { position: fixed; inset: 64px 4vmin 4vmin; display: grid; grid-template-columns: 1.25fr 1fr; gap: 4vmin; }
+
+    /* ---- left: now playing on a record in the middle of a rangoli ---- */
+    .left { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-width: 0; }
+    .deck { position: relative; width: 52vmin; height: 52vmin; display: grid; place-items: center; margin-bottom: 7vmin; }
+    .deck .rangoli { position: absolute; inset: -9vmin; width: calc(100% + 18vmin); height: calc(100% + 18vmin); opacity: .55; }
+    .deck .vinyl { width: 38vmin; height: 38vmin; box-shadow: 0 2vmin 6vmin rgba(0,0,0,.6), 0 0 0 .6vmin rgba(255, 194, 61, .35); }
+    .eyebrowbig { display: flex; align-items: center; justify-content: center; gap: .6vmin; margin-top: 0;
+      font-size: 1.9vmin; letter-spacing: .3em; text-transform: uppercase; color: var(--accent); }
+    .eyebrowbig .eq { height: 2.2vmin; } .eyebrowbig .eq i { width: .45vmin; }
+    .songtitle { font-family: "Bricolage Grotesque", system-ui, sans-serif; font-weight: 800; font-size: 6vmin; line-height: 1.05;
+      letter-spacing: -.02em; margin: 1vmin 0 .4vmin; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .songartist { font-size: 3vmin; color: var(--muted); }
+    .reqby { margin-top: 1.6vmin; font-size: 2.4vmin; color: var(--accent); }
+    .left .dedication { margin-top: 1vmin; font-size: 3vmin; max-width: 90%; }
+
+    /* ---- right: title, up next, QR ---- */
+    .right { display: flex; flex-direction: column; min-width: 0; min-height: 0; gap: 2.4vmin; }
+    .brand { text-align: center; }
+    .brand .partyline { display: flex; align-items: center; justify-content: center; gap: 1.4vmin; }
+    .brand .party { font-size: 3.4vmin; }
+    .brand .diya { width: 5.4vmin; height: 6vmin; }
+    .brand .onair { margin-top: 1.4vmin; font-size: 1.4vmin; }
+    .brand .djname { font-size: 10vmin; display: inline-block; margin-top: .6vmin; }
+
+    .panel { background: rgba(34, 16, 48, .72); border: 1px solid rgba(255, 194, 61, .25); border-radius: 2vmin;
+      padding: 1.8vmin 2.2vmin; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+    .upnext { flex: 1; min-height: 0; overflow: hidden; }
+    .panel h2 { margin: 0 0 1vmin; font-size: 1.6vmin; color: var(--accent); }
+    .upnext ol { list-style: none; margin: 0; padding: 0; }
+    .upnext li { display: flex; align-items: center; gap: 1.6vmin; padding: 1vmin 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+    .upnext li:last-child { border-bottom: 0; }
+    .upnext .n { width: 3vmin; text-align: center; font-weight: 800; font-size: 2.2vmin; color: var(--accent); }
+    .upnext img { width: 6vmin; height: 6vmin; border-radius: 1vmin; object-fit: cover; flex: none; }
+    .upnext .meta { min-width: 0; flex: 1; }
+    .upnext .t { font-weight: 700; font-size: 2.3vmin; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .upnext .a { font-size: 1.8vmin; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .upnext .who { font-size: 1.7vmin; color: var(--accent); }
+    .upnext .dedication { font-size: 1.7vmin; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .upnext .empty { color: var(--muted); font-size: 2.2vmin; padding: 1vmin 0; }
+
+    .qrbox { display: flex; align-items: center; gap: 2.4vmin; }
+    #qr { background: #fff; padding: 1.2vmin; border-radius: 1.4vmin; flex: none; }
+    #qr img, #qr canvas { display: block; width: 17vmin !important; height: 17vmin !important; }
+    .qrtext .big { font-family: "Bricolage Grotesque", system-ui, sans-serif; font-weight: 800; font-size: 3.6vmin; line-height: 1.05; }
+    .qrtext .small { color: var(--muted); font-size: 1.9vmin; margin-top: .8vmin; }
+    .qrtext .url { color: var(--accent); font-size: 1.9vmin; margin-top: .6vmin; word-break: break-all; }
+
+    /* ---- "new request" announcement ---- */
+    .announce { position: fixed; left: 50%; top: 9vmin; transform: translate(-50%, -30vmin); z-index: 25;
+      max-width: 80vw; padding: 2vmin 4vmin; border-radius: 2.4vmin; text-align: center;
+      background: linear-gradient(135deg, rgba(255, 138, 31, .95), rgba(255, 46, 126, .95));
+      box-shadow: 0 2vmin 8vmin rgba(255, 60, 60, .45); transition: transform .6s cubic-bezier(.2, 1.4, .4, 1); }
+    .announce.show { transform: translate(-50%, 0); }
+    .announce .l1 { font-size: 3.6vmin; font-weight: 800; }
+    .announce .l2 { font-size: 2.6vmin; margin-top: .6vmin; font-style: italic; }
+
+    /* ---- one-tap full screen (browsers require a tap) ---- */
+    .start { position: fixed; left: 2vmin; bottom: 2vmin; z-index: 26; font-size: 1.8vmin; padding: 1.2vmin 2vmin;
+      background: rgba(34, 16, 48, .9); border: 1px solid rgba(255, 194, 61, .4); color: var(--text); }
+    .offline { position: fixed; left: 50%; bottom: 3vmin; transform: translateX(-50%); z-index: 26; font-size: 2vmin; }
+
+    /* Portrait screens (e.g. a tablet standing up): stack the columns */
+    @media (orientation: portrait) {
+      body { overflow-y: auto; font-size: 2vmin; }
+      .screen { position: static; padding: 72px 4vmin 4vmin; grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sky" aria-hidden="true"></div>
+  <div class="backdrop" id="backdrop" aria-hidden="true"></div>
+  <div class="glow" aria-hidden="true"><span></span><span></span><span></span></div>
+  <div class="embers" id="embers" aria-hidden="true"></div>
+  <canvas class="fx" id="fx" aria-hidden="true"></canvas>
+  <div class="toran" id="toran" aria-hidden="true"></div>
+
+  <main class="screen">
+    <!-- Now playing -->
+    <section class="left">
+      <div class="deck">
+        <svg class="rangoli" id="rangoli" aria-hidden="true"></svg>
+        <div class="vinyl"><img id="nowArt" alt=""></div>
+      </div>
+      <div class="eyebrowbig"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Now playing</div>
+      <div class="songtitle" id="nowTitle">Waiting for the first song…</div>
+      <div class="songartist" id="nowArtist"></div>
+      <div class="reqby hidden" id="nowBy"></div>
+      <div class="dedication hidden" id="nowDedication"></div>
+    </section>
+
+    <!-- Branding, queue, QR -->
+    <section class="right">
+      <div class="brand">
+        <div class="partyline">
+          <svg class="diya" viewBox="0 0 40 44" aria-hidden="true"><use href="#diya"/></svg>
+          <div class="party" id="party">Himanshu and Kirti’s Diwali Party</div>
+          <svg class="diya" viewBox="0 0 40 44" aria-hidden="true"><use href="#diya"/></svg>
+        </div>
+        <div class="onair">ON AIR</div>
+        <div><span class="djwrap"><span class="djname" id="djName">DJ Darshan</span></span></div>
+      </div>
+
+      <div class="panel upnext">
+        <h2>Up next</h2>
+        <ol id="upnext"><li class="empty">Scan the code and add the first song!</li></ol>
+      </div>
+
+      <div class="panel qrbox">
+        <div id="qr"></div>
+        <div class="qrtext">
+          <div class="big">🎵 Scan to add a song</div>
+          <div class="small">No app or login. Add a dedication too 💌</div>
+          <div class="url" id="url"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="announce" id="announce" role="status"><div class="l1" id="annL1"></div><div class="l2" id="annL2"></div></div>
+  <button class="start" id="start">⛶ Full screen</button>
+  <div class="banner offline hidden" id="offline">Darshan hasn’t connected Spotify yet.</div>
+
+<script src="/diwali.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+function el(tag, props = {}, ...kids) { const n = document.createElement(tag); Object.assign(n, props); for (const k of kids) if (k != null) n.append(k); return n; }
+
+// ---- decorations ------------------------------------------------------------
+Diwali.diyaDefs();
+Diwali.toran($('toran'));
+Diwali.rangoli($('rangoli'));
+Diwali.embers($('embers'), 40);
+const fx = Diwali.fireworks($('fx'));
+fx.ambient(4500, 1.6); // bigger, more frequent fireworks on a big screen
+
+// ---- QR code pointing at the guest page ----------------------------------------
+const target = location.origin + '/';
+$('url').textContent = target.replace(/^https?:\/\//, '').replace(/\/$/, '');
+new QRCode($('qr'), { text: target, width: 512, height: 512, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+
+// ---- full screen + keep the screen awake ------------------------------------------
+let wakeLock = null;
+async function stayAwake() { try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { /* not supported */ } }
+$('start').onclick = async () => {
+  try { await document.documentElement.requestFullscreen(); } catch {}
+  stayAwake();
+};
+document.addEventListener('fullscreenchange', () => $('start').classList.toggle('hidden', Boolean(document.fullscreenElement)));
+document.addEventListener('visibilitychange', () => { if (!document.hidden && wakeLock) stayAwake(); });
+// hide the mouse cursor when it isn't moving
+let idleTimer;
+addEventListener('mousemove', () => { document.body.classList.remove('idle'); clearTimeout(idleTimer); idleTimer = setTimeout(() => document.body.classList.add('idle'), 3000); });
+
+// ---- "new request" announcements, one at a time -----------------------------------
+const seen = new Set();   // requested songs we've already announced
+let firstLoad = true;
+const queue = [];
+let showing = false;
+function announce(t) { queue.push(t); if (!showing) next(); }
+function next() {
+  const t = queue.shift();
+  if (!t) { showing = false; return; }
+  showing = true;
+  $('annL1').textContent = `🎆 ${t.requestedBy} added “${t.name}”`;
+  $('annL2').textContent = t.dedication ? `💌 ${t.dedication}` : t.artists;
+  $('announce').classList.add('show');
+  fx.burst(innerWidth * .3, innerHeight * .3, 120, 1.6);
+  setTimeout(() => fx.burst(innerWidth * .7, innerHeight * .25, 120, 1.6), 350);
+  setTimeout(() => fx.burst(innerWidth * .5, innerHeight * .4, 140, 1.8), 700);
+  setTimeout(() => { $('announce').classList.remove('show'); setTimeout(next, 700); }, 6000);
+}
+
+// ---- now playing + up next, refreshed every 4 seconds -----------------------------
+async function refresh() {
+  try {
+    const d = await (await fetch('/api/nowplaying')).json();
+    if (d.djName) $('djName').textContent = d.djName;
+    if (d.partyName) $('party').textContent = d.partyName;
+    $('offline').classList.toggle('hidden', d.connected);
+    document.body.classList.toggle('music-on', Boolean(d.current));
+
+    const c = d.current;
+    $('nowTitle').textContent = c?.name || 'Waiting for the first song…';
+    $('nowArtist').textContent = c?.artists || '';
+    $('nowBy').textContent = c?.requestedBy ? `🪔 Requested by ${c.requestedBy}` : '';
+    $('nowBy').classList.toggle('hidden', !c?.requestedBy);
+    $('nowDedication').textContent = c?.dedication ? `💌 “${c.dedication}”` : '';
+    $('nowDedication').classList.toggle('hidden', !c?.dedication);
+    Diwali.setArt($('nowArt'), c?.image, 0);
+    $('backdrop').style.backgroundImage = c?.image ? `url("${c.image.replace(/"/g, '')}")` : 'none';
+
+    const up = (d.upNext || []).slice(0, 6);
+    $('upnext').replaceChildren(...(up.length ? up.map((t, i) => {
+      const img = el('img', { alt: '' });
+      Diwali.setArt(img, t.thumb, i + 2);
+      const meta = el('div', { className: 'meta' },
+        el('div', { className: 't', textContent: t.name }),
+        el('div', { className: 'a', textContent: t.artists }));
+      if (t.requestedBy) meta.append(el('div', { className: 'who', textContent: `🪔 ${t.requestedBy}` }));
+      if (t.dedication) meta.append(el('div', { className: 'dedication', textContent: `💌 “${t.dedication}”` }));
+      return el('li', {}, el('span', { className: 'n', textContent: i + 1 }), img, meta);
+    }) : [el('li', { className: 'empty', textContent: 'Scan the code and add the first song!' })]));
+    fitUpNext();
+
+    // Announce songs guests requested since the last refresh (skip what was there on first load).
+    for (const t of [c, ...(d.upNext || [])]) {
+      if (!t?.requestedBy || seen.has(t.id)) continue;
+      seen.add(t.id);
+      if (!firstLoad) announce(t);
+    }
+    firstLoad = false;
+  } catch { /* keep the last good view; try again next tick */ }
+}
+// Show only the songs that fit completely in the panel (never a half-cut row).
+function fitUpNext() {
+  const list = $('upnext'), box = list.parentElement.getBoundingClientRect();
+  for (const li of [...list.children].reverse()) {
+    if (list.children.length > 1 && li.getBoundingClientRect().bottom > box.bottom - 8) li.remove();
+  }
+}
+addEventListener('resize', refresh);
+
+refresh();
+setInterval(refresh, 4000);
+</script>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>DJ Darshan · Booth</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .toggle { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+    .toggle:last-child { border-bottom: 0; }
+    .seg { display: inline-flex; background: var(--panel-2); border-radius: 999px; padding: 3px; }
+    .seg button { background: transparent; color: var(--muted); padding: 8px 14px; }
+    .seg button.on { background: var(--accent); color: var(--accent-ink); }
+    .log { font-size: 0.9rem; color: var(--muted); }
+    .log li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+    .bar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .count { background: var(--warn); color: var(--bg); border-radius: 999px; padding: 0 8px; font-size: 0.8rem; margin-left: 6px; }
+  </style>
+</head>
+<body>
+  <!-- PIN gate: only the host gets past this. -->
+  <section id="gate">
+    <h1>DJ Darshan · Booth</h1>
+    <p class="sub">Enter your host PIN.</p>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="PIN">
+    <div class="bar"><button class="go" id="enter">Unlock</button></div>
+  </section>
+
+  <section id="app" class="hidden">
+    <h1>DJ Darshan · Booth</h1>
+    <div id="msg" class="banner hidden"></div>
+
+    <!-- Spotify connection -->
+    <div id="connectBox" class="card hidden">
+      <p style="margin-top:0">Connect the Spotify account that’s playing on your phone.</p>
+      <button class="go" id="connect">Connect Spotify</button>
+    </div>
+
+    <!-- Now playing + skip -->
+    <div class="card now" id="nowBox">
+      <img id="nowArt" alt="">
+      <div style="flex:1;min-width:0">
+        <div class="eyebrow">Now playing</div>
+        <div class="title" id="nowTitle">—</div>
+        <div id="nowArtist" style="color:var(--muted)"></div>
+      </div>
+      <button id="skip" title="Same as Next on your phone">Next ⏭</button>
+    </div>
+
+    <h2>Controls</h2>
+    <div class="card">
+      <div class="toggle">
+        <div><strong>Requests</strong><div class="artist" style="color:var(--muted);font-size:.9rem">Auto adds instantly; Approve holds them for you</div></div>
+        <div class="seg" id="modeSeg">
+          <button data-mode="auto">Auto</button>
+          <button data-mode="approve">Approve</button>
+        </div>
+      </div>
+      <div class="toggle">
+        <div><strong>Block explicit</strong></div>
+        <div class="seg" id="explicitSeg">
+          <button data-val="true">On</button>
+          <button data-val="false">Off</button>
+        </div>
+      </div>
+    </div>
+
+    <h2>Waiting for approval <span class="count hidden" id="pendingCount"></span></h2>
+    <ul class="list card" id="pending"></ul>
+    <div class="bar"><button class="go hidden" id="approveAll">Approve all</button></div>
+
+    <h2>Up next</h2>
+    <ul class="list card" id="upnext"></ul>
+
+    <h2>Activity</h2>
+    <ul class="list log" id="log"></ul>
+
+    <h2>Setup</h2>
+    <div class="bar">
+      <a href="/tv" target="_blank"><button>📺 Big screen</button></a>
+      <a href="/qr" target="_blank"><button>Show QR poster</button></a>
+      <button id="reconnect">Reconnect Spotify</button>
+      <button class="bad" id="reset">Reset night</button>
+    </div>
+  </section>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+function el(tag, props = {}, ...kids) { const n = document.createElement(tag); Object.assign(n, props); for (const k of kids) if (k != null) n.append(k); return n; }
+let toastTimer;
+function toast(msg, kind = 'ok') { const t = $('toast'); t.textContent = msg; t.className = `toast show ${kind}`; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.className = 'toast'), 3500); }
+const store = {
+  get: (k) => { try { return localStorage.getItem(k) || ''; } catch { return ''; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+};
+
+let PIN = store.get('dj-pin');
+
+// Every host call sends the PIN in a header.
+async function api(method, body) {
+  const r = await fetch('/api/host', {
+    method,
+    headers: { 'x-host-pin': PIN, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401) { lock(); throw new Error('Wrong PIN'); }
+  if (!r.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+// Run a host action, then refresh the screen.
+async function act(body, okMsg) {
+  try { await api('POST', body); if (okMsg) toast(okMsg); await refresh(); }
+  catch (e) { toast(e.message, 'bad'); }
+}
+
+// ---- PIN gate ------------------------------------------------------------
+function lock() { $('app').classList.add('hidden'); $('gate').classList.remove('hidden'); }
+async function unlock() {
+  PIN = $('pin').value.trim() || PIN;
+  try { await refresh(); store.set('dj-pin', PIN); $('gate').classList.add('hidden'); $('app').classList.remove('hidden'); }
+  catch { toast('Wrong PIN', 'bad'); }
+}
+$('enter').onclick = unlock;
+$('pin').addEventListener('keydown', (e) => e.key === 'Enter' && unlock());
+
+// ---- rendering -----------------------------------------------------------
+function row(t, right) {
+  const meta = el('div', { className: 'meta' },
+    el('div', { className: 'name', textContent: (t.explicit ? '🅴 ' : '') + t.name }),
+    el('div', { className: 'artist', textContent: t.artists + (t.by || t.requestedBy ? ` · ${t.by || t.requestedBy}` : '') }));
+  if (t.dedication) meta.append(el('div', { className: 'artist', style: 'color:#ffd9e8;font-style:italic', textContent: `💌 “${t.dedication}”` }));
+  if (t.note) meta.append(el('div', { className: 'artist', style: 'color:var(--warn)', textContent: t.note }));
+  return el('li', { className: 'row' }, el('img', { src: t.thumb || '', alt: '' }), meta, right);
+}
+
+function describe(e) {
+  const song = (e.name ? `“${e.name}”` : 'a song') + (e.dedication ? ` 💌 ${e.dedication}` : '');
+  switch (e.type) {
+    case 'queued': return `${e.by} queued ${song}`;
+    case 'pending': return `${e.by} requested ${song} (waiting)`;
+    case 'approved': return `You approved ${song} from ${e.by}`;
+    case 'rejected': return `You declined a request`;
+    case 'mode': return `Requests set to ${e.mode === 'auto' ? 'Auto' : 'Approve'}`;
+    case 'explicit': return `Block explicit ${e.blockExplicit ? 'on' : 'off'}`;
+    case 'connected': return 'Spotify connected';
+    default: return e.type;
+  }
+}
+const ago = (ts) => { const m = Math.round((Date.now() - ts) / 60000); return m < 1 ? 'now' : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h`; };
+
+async function refresh() {
+  const d = await api('GET');
+
+  // Connection + player state
+  $('connectBox').classList.toggle('hidden', d.connected);
+  const msg = d.playerError || (!d.connected ? 'Spotify isn’t connected yet.' : '');
+  $('msg').textContent = msg; $('msg').classList.toggle('hidden', !msg);
+
+  $('nowTitle').textContent = d.now?.current?.name || 'Nothing playing';
+  $('nowArtist').textContent = d.now?.current?.artists || 'Start a playlist in Spotify on your phone';
+  $('nowArt').src = d.now?.current?.image || '';
+
+  // Toggles
+  for (const b of $('modeSeg').children) b.classList.toggle('on', b.dataset.mode === d.settings.mode);
+  for (const b of $('explicitSeg').children) b.classList.toggle('on', b.dataset.val === String(d.settings.blockExplicit));
+
+  // Pending approvals
+  $('pending').replaceChildren(...(d.pending.length ? d.pending.map((p) => {
+    const ok = el('button', { className: 'go', textContent: '✓', title: 'Approve', onclick: () => act({ action: 'approve', trackId: p.id }, 'Added to queue') });
+    const no = el('button', { className: 'bad', textContent: '✕', title: 'Decline', onclick: () => act({ action: 'reject', trackId: p.id }) });
+    return row(p, el('div', { className: 'actions' }, ok, no));
+  }) : [el('li', { className: 'empty', textContent: 'Nothing waiting.' })]));
+  $('pendingCount').textContent = d.pending.length;
+  $('pendingCount').classList.toggle('hidden', !d.pending.length);
+  $('approveAll').classList.toggle('hidden', d.pending.length < 2);
+
+  // Up next
+  const up = d.now?.upNext || [];
+  $('upnext').replaceChildren(...(up.length ? up.map((t) => row(t, null)) : [el('li', { className: 'empty', textContent: 'Queue is empty.' })]));
+
+  // Activity log
+  $('log').replaceChildren(...(d.log.length
+    ? d.log.map((e) => el('li', { textContent: `${ago(e.at)} · ${describe(e)}` }))
+    : [el('li', { className: 'empty', textContent: 'No activity yet.' })]));
+}
+
+// ---- controls ------------------------------------------------------------
+$('modeSeg').onclick = (e) => { const m = e.target.dataset.mode; if (m) act({ action: 'setMode', mode: m }, m === 'auto' ? 'Auto-queue on' : 'Approval mode on'); };
+$('explicitSeg').onclick = (e) => { const v = e.target.dataset.val; if (v) act({ action: 'setExplicit', blockExplicit: v === 'true' }); };
+$('approveAll').onclick = () => act({ action: 'approveAll' }, 'All approved');
+$('skip').onclick = () => act({ action: 'skip' }, 'Skipped');
+$('reset').onclick = () => { if (confirm('Clear all requests, duplicate memory and the activity log?')) act({ action: 'reset' }, 'Fresh start'); };
+const goConnect = () => (location.href = `/api/login?pin=${encodeURIComponent(PIN)}`);
+$('connect').onclick = goConnect;
+$('reconnect').onclick = goConnect;
+
+// Messages from the Spotify login round-trip
+const params = new URLSearchParams(location.search);
+if (params.get('connected')) toast('Spotify connected 🎉');
+if (params.get('error')) toast(`Spotify: ${params.get('error')}`, 'bad');
+if (params.toString()) history.replaceState(null, '', '/host');
+
+// Auto-unlock with a saved PIN, then poll every 5s while the screen is visible.
+if (PIN) unlock();
+setInterval(() => { if (!document.hidden && !$('app').classList.contains('hidden')) refresh().catch(() => {}); }, 5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+/* diwali.css — shared festive look for the guest page (/) and big screen (/tv).
+   Load after style.css. Decorations are built by diwali.js. */
+
+:root {
+  --bg: #14081f; --panel: #221330; --panel-2: #2f1b40; --line: #3d2650;
+  --text: #fff6ea; --muted: #c9b2d3;
+  --accent: #ffc23d; --accent-ink: #2a1600;
+  --marigold: #ff9f1c; --saffron: #ff6a00; --pink: #ff2e7e; --violet: #b98cff; --leaf: #2f8a3a;
+}
+html { overflow-x: hidden; }
+body { overflow-x: hidden; background: transparent; }
+
+/* ---- night sky + drifting warm glows ---- */
+.sky { position: fixed; inset: 0; z-index: -3; background: radial-gradient(120% 80% at 50% 0%, #2a0f3d 0%, #14081f 55%, #0c0514 100%); }
+.glow { position: fixed; inset: 0; z-index: -2; pointer-events: none; overflow: hidden; }
+.glow span { position: absolute; width: 65vmax; height: 65vmax; border-radius: 50%; filter: blur(90px); opacity: .32; }
+.glow span:nth-child(1) { background: var(--saffron); top: -38vmax; left: -28vmax; animation: drift 18s ease-in-out infinite alternate; }
+.glow span:nth-child(2) { background: var(--pink); top: -22vmax; right: -42vmax; animation: drift 22s ease-in-out infinite alternate-reverse; }
+.glow span:nth-child(3) { background: var(--violet); bottom: -52vmax; left: -12vmax; opacity: .22; animation: drift 26s ease-in-out infinite alternate; }
+@keyframes drift { to { transform: translate(8vmax, 10vmax) scale(1.15); } }
+
+/* ---- embers rising ---- */
+.embers { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.embers i { position: absolute; bottom: -10px; border-radius: 50%; background: #ffd27a;
+  box-shadow: 0 0 8px 2px rgba(255, 170, 40, .7); animation: rise linear infinite; opacity: 0; }
+@keyframes rise { 0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: .9; } 100% { transform: translate(var(--sway), -110vh); opacity: 0; } }
+
+/* ---- fireworks canvas: on top, never blocks taps ---- */
+.fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 30; }
+
+/* ---- marigold toran across the top of the screen ---- */
+.toran { position: absolute; top: 0; left: 0; width: 100%; height: 64px; overflow: hidden; z-index: 1; pointer-events: none; }
+.toran::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 12px;
+  background: radial-gradient(circle at 6px 6px, var(--marigold) 5px, transparent 6px) 0 0 / 12px 12px repeat-x,
+              linear-gradient(#3a7d2a, #2a5c1f) 0 5px / 100% 2px no-repeat; }
+.toran .strand { position: absolute; top: 8px; display: flex; flex-direction: column; align-items: center;
+  transform-origin: top center; animation: swing 3.2s ease-in-out infinite alternate; }
+.toran .strand b { width: 12px; height: 12px; border-radius: 50%; margin-top: -2px;
+  background: radial-gradient(circle at 35% 35%, #ffe08a, var(--c) 60%, #b84a00 100%); }
+.toran .strand em { width: 8px; height: 12px; margin-top: -1px; border-radius: 0 0 50% 50%; background: #3a7d2a; }
+@keyframes swing { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
+
+/* ---- rangoli: crisp filled petals, slowly turning ---- */
+.rangoli { display: block; shape-rendering: geometricPrecision; animation: turn 90s linear infinite; will-change: transform; }
+@keyframes turn { to { transform: rotate(360deg); } }
+
+/* ---- diya: flame always flickering, glow breathing, sparks rising ---- */
+.diya { width: 40px; height: 44px; flex: none; overflow: visible; }
+.diya .flame  { transform-box: fill-box; transform-origin: 50% 100%; animation: flicker .9s ease-in-out infinite alternate; }
+.diya .core   { transform-box: fill-box; transform-origin: 50% 100%; animation: flicker .7s ease-in-out infinite alternate-reverse; }
+.diya .halo   { animation: halo 1.6s ease-in-out infinite alternate; }
+.diya .spark  { animation: spark 1.8s ease-out infinite; }
+.diya .spark:nth-of-type(2) { animation-delay: -.9s; }
+@keyframes flicker {
+  0%   { transform: scale(1, 1) rotate(-4deg); }
+  30%  { transform: scale(.9, 1.12) rotate(3deg); }
+  60%  { transform: scale(1.06, .94) rotate(-2deg); }
+  100% { transform: scale(.96, 1.06) rotate(4deg); }
+}
+@keyframes halo { from { opacity: .4; transform: scale(.92); } to { opacity: .85; transform: scale(1.08); } }
+.diya .halo { transform-box: fill-box; transform-origin: center; }
+@keyframes spark { 0% { transform: translate(0, 0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(var(--dx, 3px), -16px); opacity: 0; } }
+
+/* ---- party name in a decorative Indian-style face ---- */
+.party { font-family: "Yatra One", Georgia, serif; color: var(--accent); line-height: 1.15;
+  text-shadow: 0 0 18px rgba(255, 170, 40, .55); }
+
+/* ---- DJ name: gold shimmer + neon glow that flickers like a sign ---- */
+.djname {
+  font-family: "Bricolage Grotesque", system-ui, sans-serif; font-weight: 800; white-space: nowrap;
+  letter-spacing: -.04em; line-height: .95;
+  background: linear-gradient(100deg, #fff3c4 0%, #ffc23d 22%, #ff7a1a 42%, #ff2e7e 62%, #ffc23d 82%, #fff3c4 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: shimmer 6s linear infinite, neon 5s linear infinite;
+}
+@keyframes shimmer { to { background-position: -250% 0; } }
+@keyframes neon {
+  0%, 17%, 21%, 23%, 61%, 64%, 100% {
+    opacity: 1; filter: drop-shadow(0 0 4px rgba(255, 210, 120, .95)) drop-shadow(0 0 22px rgba(255, 90, 40, .65)); }
+  19%, 22%, 62.5% { opacity: .45; filter: none; }
+}
+/* the whole name bobs to the beat while music plays */
+.djwrap { display: inline-block; }
+.music-on .djwrap { animation: beat .5s ease-in-out infinite alternate; }
+@keyframes beat { from { transform: scale(1); } to { transform: scale(1.035); } }
+
+/* ---- blinking ON AIR sign ---- */
+.onair { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 6px;
+  font: 800 .72rem/1.4 system-ui, sans-serif; letter-spacing: .2em; color: #ff4d5e;
+  border: 1.5px solid #ff4d5e; box-shadow: 0 0 10px rgba(255, 77, 94, .55), inset 0 0 8px rgba(255, 77, 94, .35);
+  text-shadow: 0 0 8px rgba(255, 77, 94, .9); animation: onair 2.4s steps(1) infinite; }
+.onair::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #ff4d5e; box-shadow: 0 0 8px #ff4d5e;
+  animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: .15; } }
+@keyframes onair { 0%, 88% { opacity: 1; } 90% { opacity: .35; } 93% { opacity: 1; } 95% { opacity: .35; } }
+
+/* ---- spinning record + equalizer (now playing) ---- */
+.vinyl { position: relative; flex: none; border-radius: 50%;
+  background: repeating-radial-gradient(circle, #111 0 2px, #1c1c1c 2px 4px); box-shadow: 0 6px 24px rgba(0,0,0,.5); }
+.vinyl img { position: absolute; inset: 22%; width: 56%; height: 56%; border-radius: 50%; object-fit: cover; }
+.vinyl::after { content: ""; position: absolute; inset: 47%; border-radius: 50%; background: var(--bg); }
+.music-on .vinyl { animation: spin 4s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.eq { display: inline-flex; gap: 3px; align-items: flex-end; height: 16px; margin-right: 8px; }
+.eq i { width: 3px; height: 30%; background: var(--accent); border-radius: 2px; }
+.music-on .eq i { animation: bounce .9s ease-in-out infinite; }
+.eq i:nth-child(2) { animation-delay: -.3s !important; } .eq i:nth-child(3) { animation-delay: -.6s !important; } .eq i:nth-child(4) { animation-delay: -.15s !important; }
+@keyframes bounce { 0%, 100% { height: 25%; } 50% { height: 100%; } }
+
+/* ---- dedication line ---- */
+.dedication { font-style: italic; color: #ffd9e8; }
+
+/* Phones set to "reduce motion": keep the diyas burning (gentle), calm everything else. */
+@media (prefers-reduced-motion: reduce) {
+  .glow span, .toran .strand, .rangoli, .djname, .music-on .djwrap, .music-on .vinyl, .music-on .eq i, .onair { animation: none !important; }
+  .djname { filter: drop-shadow(0 0 4px rgba(255, 210, 120, .9)); }
+  .embers { display: none; }
+}
