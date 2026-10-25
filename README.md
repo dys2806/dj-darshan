@@ -69,6 +69,12 @@ Open `https://YOUR-URL/qr` → **Print poster**, or keep it open on a tablet/lap
 
 ---
 
+## Guest picks keepsake
+Every guest song that reaches Spotify is saved to a private playlist (created with the first request)
+and logged with who asked and their dedication. On `/host`: **Open playlist in Spotify** or download
+**Picks + dedications (CSV)**. *Reset night* keeps the keepsake; *New keepsake* starts fresh for the next party.
+If you connected Spotify before this feature existed, tap **Reconnect Spotify** once to grant playlist permission.
+
 ## Party-night checklist
 - [ ] Phone on a charger, Spotify open, a playlist **already playing** to the JBL
       (Spotify only accepts queue adds when something is playing).
@@ -92,6 +98,6 @@ Open `https://YOUR-URL/qr` → **Print poster**, or keep it open on a tablet/lap
 - Now Playing / Up Next is cached for ~8 seconds to stay well inside Spotify's rate limits.
 
 ## Tests
-`npm install && npm test` runs 27 end-to-end checks offline (fake Spotify + fake Redis):
-login/state security, auto-queue, duplicates, explicit filter, dedications, approval flow, idle-phone fallback,
+`npm install && npm test` runs 34 end-to-end checks offline (fake Spotify + fake Redis):
+login/state security, auto-queue, duplicates, explicit filter, dedications, guest-picks keepsake playlist, approval flow, idle-phone fallback,
 skip and reset.

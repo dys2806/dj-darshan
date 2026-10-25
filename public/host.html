@@ -73,6 +73,24 @@
     <h2>Up next</h2>
     <ul class="list card" id="upnext"></ul>
 
+    <h2>Guest picks keepsake 🎁</h2>
+    <div class="card" id="keepsake">
+      <!-- Shown until the host re-connects Spotify with playlist permission -->
+      <div id="ksOff" class="hidden">
+        <p style="margin-top:0">Every guest song can be saved to a private Spotify playlist for Himanshu and Kirti. Reconnect Spotify once to allow it.</p>
+        <button class="go" id="ksConnect">Reconnect Spotify</button>
+      </div>
+      <div id="ksOn" class="hidden">
+        <p style="margin:0 0 4px" id="ksCount">No guest songs yet.</p>
+        <p style="margin:0;color:var(--muted);font-size:.9rem" id="ksHint">The playlist is created with the first guest request.</p>
+        <p class="hidden" style="margin:6px 0 0;color:var(--warn);font-size:.9rem" id="ksError"></p>
+      </div>
+      <div class="bar">
+        <a id="ksOpen" class="hidden" target="_blank" rel="noopener"><button>Open playlist in Spotify</button></a>
+        <button id="ksCsv">⬇ Picks + dedications (CSV)</button>
+      </div>
+    </div>
+
     <h2>Activity</h2>
     <ul class="list log" id="log"></ul>
 
@@ -82,6 +100,7 @@
       <a href="/qr" target="_blank"><button>Show QR poster</button></a>
       <button id="reconnect">Reconnect Spotify</button>
       <button class="bad" id="reset">Reset night</button>
+      <button class="bad" id="newKeepsake">New keepsake (next party)</button>
     </div>
   </section>
 
@@ -183,6 +202,19 @@ async function refresh() {
   const up = d.now?.upNext || [];
   $('upnext').replaceChildren(...(up.length ? up.map((t) => row(t, null)) : [el('li', { className: 'empty', textContent: 'Queue is empty.' })]));
 
+  // Keepsake playlist status
+  const ks = d.keepsake || {};
+  $('ksOff').classList.toggle('hidden', !d.connected || ks.enabled);
+  $('ksOn').classList.toggle('hidden', !ks.enabled);
+  $('ksCount').textContent = ks.count
+    ? `🎶 ${ks.count} guest song${ks.count === 1 ? '' : 's'} saved tonight`
+    : 'No guest songs yet.';
+  $('ksHint').textContent = ks.url ? `Private playlist: ${ks.name}` : 'The playlist is created with the first guest request.';
+  $('ksError').textContent = ks.error ? `Couldn’t save the last song to the playlist: ${ks.error}` : '';
+  $('ksError').classList.toggle('hidden', !ks.error);
+  $('ksOpen').classList.toggle('hidden', !ks.url);
+  if (ks.url) $('ksOpen').href = ks.url;
+
   // Activity log
   $('log').replaceChildren(...(d.log.length
     ? d.log.map((e) => el('li', { textContent: `${ago(e.at)} · ${describe(e)}` }))
@@ -194,10 +226,26 @@ $('modeSeg').onclick = (e) => { const m = e.target.dataset.mode; if (m) act({ ac
 $('explicitSeg').onclick = (e) => { const v = e.target.dataset.val; if (v) act({ action: 'setExplicit', blockExplicit: v === 'true' }); };
 $('approveAll').onclick = () => act({ action: 'approveAll' }, 'All approved');
 $('skip').onclick = () => act({ action: 'skip' }, 'Skipped');
-$('reset').onclick = () => { if (confirm('Clear all requests, duplicate memory and the activity log?')) act({ action: 'reset' }, 'Fresh start'); };
+$('reset').onclick = () => { if (confirm('Clear all requests, duplicate memory and the activity log? (The guest-picks keepsake is kept.)')) act({ action: 'reset' }, 'Fresh start'); };
 const goConnect = () => (location.href = `/api/login?pin=${encodeURIComponent(PIN)}`);
 $('connect').onclick = goConnect;
 $('reconnect').onclick = goConnect;
+$('ksConnect').onclick = goConnect;
+$('newKeepsake').onclick = () => {
+  if (confirm('Start a new keepsake for your next party? Tonight’s playlist stays in Spotify, but the picks list here is cleared. Download the CSV first if you want it.'))
+    act({ action: 'newKeepsake' }, 'Ready for the next party');
+};
+// Download tonight's picks + dedications (the PIN goes in a header, so fetch then save).
+$('ksCsv').onclick = async () => {
+  try {
+    const r = await fetch('/api/host?export=csv', { headers: { 'x-host-pin': PIN } });
+    if (!r.ok) throw new Error('Download failed');
+    const url = URL.createObjectURL(await r.blob());
+    const a = el('a', { href: url, download: 'diwali-party-guest-picks.csv' });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (e) { toast(e.message, 'bad'); }
+};
 
 // Messages from the Spotify login round-trip
 const params = new URLSearchParams(location.search);

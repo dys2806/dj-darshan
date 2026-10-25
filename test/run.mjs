@@ -20,7 +20,13 @@ function run([cmd, ...a]) {
   const L = () => { if (!db.has(k)) db.set(k, []); return db.get(k); };
   switch (cmd) {
     case 'get': return db.get(k) ?? null;
-    case 'set': db.set(k, String(a[1])); return 'OK';
+    case 'set': {
+      const nx = a.slice(2).some((x) => String(x).toLowerCase() === 'nx');
+      if (nx && db.has(k)) return null;                      // SET NX: only if missing
+      db.set(k, String(a[1])); return 'OK';
+    }
+    case 'rpush': for (const v of a.slice(1)) L().push(String(v)); return L().length;
+    case 'llen': return (db.get(k) || []).length;
     case 'del': return a.filter((x) => db.delete(x)).length;
     case 'getdel': { const v = db.get(k) ?? null; db.delete(k); return v; }
     case 'hgetall': { const h = db.get(k); return h ? [...h].flat() : []; }
@@ -61,13 +67,26 @@ const mk = (id) => ({ id, uri: `spotify:track:${id}`, name: tracks[id].name, exp
   artists: [{ name: 'Artist' }], album: { images: [{ url: 'big' }, { url: 'mid' }, { url: 'small' }] }, duration_ms: 1000 });
 let spotifyQueue = [];
 let deviceActive = true;
+let grantedScope = 'user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-modify-private playlist-modify-public';
+let playlistsCreated = 0, playlistDown = false;
+const playlistItems = [];
 const calls = [];
 globalThis.fetch = async (url, opts = {}) => {
   const u = new URL(url); const m = opts.method || 'GET';
   if (u.hostname === 'fake.upstash.io') return upstash(u, opts);
   calls.push(`${m} ${u.pathname}`);
   const json = (s, b) => new Response(b == null ? '' : JSON.stringify(b), { status: s });
-  if (u.hostname === 'accounts.spotify.com') return json(200, { access_token: 'AT', refresh_token: 'RT', expires_in: 3600 });
+  if (u.hostname === 'accounts.spotify.com') return json(200, { access_token: 'AT', refresh_token: 'RT', expires_in: 3600, scope: grantedScope });
+  if (u.pathname === '/v1/me/playlists' && m === 'POST') {
+    await new Promise((r) => setTimeout(r, 50));             // slow enough for two requests to race
+    playlistsCreated++; const b = JSON.parse(opts.body);
+    return json(201, { id: 'PL' + playlistsCreated, name: b.name, public: b.public, external_urls: { spotify: 'https://open.spotify.com/playlist/PL' + playlistsCreated } });
+  }
+  if (u.pathname.match(/^\/v1\/playlists\/[^/]+\/items$/) && m === 'POST') {
+    if (playlistDown) return json(500, { error: { status: 500, message: 'Playlist service down' } });
+    playlistItems.push(...JSON.parse(opts.body).uris.map((x) => `${u.pathname.split('/')[3]}:${x.split(':').pop()}`));
+    return json(201, { snapshot_id: 'x' });
+  }
   if (u.pathname === '/v1/search') return json(200, { tracks: { items: Object.keys(tracks).map(mk) } });
   if (u.pathname.startsWith('/v1/tracks/')) return json(200, mk(u.pathname.split('/').pop()));
   if (u.pathname === '/v1/me/player/queue' && m === 'GET') return json(200, { currently_playing: mk('DDDDDDDDDDDDDDDDDDDDDD'), queue: spotifyQueue.map(mk) });
@@ -174,6 +193,40 @@ r = await call('host', { method: 'POST', headers: host, body: { action: 'skip' }
 check('skip calls Spotify next', r.code === 200 && calls.includes('POST /v1/me/player/next') && spotifyQueue.length === before - 1);
 await call('host', { method: 'POST', headers: host, body: { action: 'reset' } });
 check('reset clears requests but keeps Spotify login', !db.has(K.taken) && !db.has(K.log) && peek(K.refresh) === 'RT');
+
+// 9. Keepsake playlist + picks log
+r = await call('host', { headers: host });
+const ks = r.body.keepsake;
+check('keepsake: one private playlist created for the night', playlistsCreated === 1 && ks.enabled && ks.url === 'https://open.spotify.com/playlist/PL1', JSON.stringify(ks));
+check('keepsake: every queued guest song saved to it', ks.count >= 3 && playlistItems.length === ks.count && playlistItems.includes('PL1:AAAAAAAAAAAAAAAAAAAAAA'), JSON.stringify({ ks, playlistItems }));
+r = await call('host', { headers: host, query: { export: 'csv' } });
+check('keepsake: CSV has song, guest and dedication', r.headers['Content-Type'].startsWith('text/csv') && r.body.includes('#,Time,Song,Artist,Requested by,Dedication') && r.body.includes('"Clean Song","Artist","Priya","For Kirti 💛"'), r.body.slice(0, 300));
+check('keepsake: reset night keeps the keepsake', peek(K.picks)?.length === ks.count && peek(K.keepsake));
+
+// a broken playlist call never stops the song from playing
+spotifyQueue = []; db.delete(K.now); playlistDown = true;
+r = await guestReq('AAAAAAAAAAAAAAAAAAAAAA', 'Isha');
+r2 = await call('host', { headers: host });
+check('keepsake: playlist failure doesn’t block the song', r.body.status === 'queued' && spotifyQueue.includes('AAAAAAAAAAAAAAAAAAAAAA') && /Playlist service down/.test(r2.body.keepsake.error || ''), JSON.stringify(r2.body.keepsake));
+playlistDown = false;
+
+// old connection without playlist permission: still logs the pick, asks host to reconnect
+db.set(K.scope, 'user-read-playback-state user-modify-playback-state');
+const itemsBefore = playlistItems.length;
+spotifyQueue = []; db.delete(K.now);
+r = await guestReq('CCCCCCCCCCCCCCCCCCCCCC', 'Dev');
+r2 = await call('host', { headers: host });
+check('keepsake: without permission, song plays + is logged, host sees reconnect', r.body.status === 'queued' && playlistItems.length === itemsBefore && r2.body.keepsake.enabled === false && r2.body.keepsake.count === ks.count + 2);
+db.set(K.scope, grantedScope);
+
+// next party: new keepsake; two guests at once still make only one new playlist
+await call('host', { method: 'POST', headers: host, body: { action: 'newKeepsake' } });
+await call('host', { method: 'POST', headers: host, body: { action: 'reset' } });
+spotifyQueue = []; db.delete(K.now);
+const created = playlistsCreated;
+await Promise.all([guestReq('AAAAAAAAAAAAAAAAAAAAAA', 'X'), guestReq('CCCCCCCCCCCCCCCCCCCCCC', 'Y')]);
+r = await call('host', { headers: host });
+check('keepsake: new party starts fresh, simultaneous requests share one playlist', playlistsCreated === created + 1 && r.body.keepsake.count === 2 && r.body.keepsake.url.endsWith('PL' + playlistsCreated), JSON.stringify({ created, playlistsCreated, k: r.body.keepsake }));
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');
 process.exit(fails ? 1 : 0);

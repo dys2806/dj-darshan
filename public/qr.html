@@ -3,43 +3,50 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DJ Darshan · Scan to Request</title>
+  <title>Diwali Song Request Queue</title>
   <link rel="stylesheet" href="/style.css">
-  <!-- QR generator; the code always points at whatever URL this site is deployed to -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Yatra+One&display=swap" rel="stylesheet">
+  <!-- QR generator; the code always points at whatever address this site is deployed to -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
-    body { text-align: center; padding-top: 40px; }
-    .big { font-size: 2.6rem; font-weight: 800; letter-spacing: -0.02em; margin: 8px 0; }
-    #qr { display: inline-block; padding: 18px; background: #fff; border-radius: 20px; margin: 20px 0; }
+    :root { --bg: #14081f; --text: #fff6ea; --muted: #c9b2d3; --accent: #ffc23d; }
+    body { text-align: center; padding-top: 36px; background: radial-gradient(120% 80% at 50% 0%, #2a0f3d 0%, #14081f 60%); min-height: 100vh; }
+    .party { font-family: "Yatra One", Georgia, serif; color: var(--accent); font-size: 1.25rem; }
+    .title { font-family: "Bricolage Grotesque", system-ui, sans-serif; font-weight: 800; font-size: 2.6rem;
+      line-height: 1.05; letter-spacing: -.02em; margin: 10px 0 4px; }
+    .dj { font-weight: 700; color: var(--accent); letter-spacing: .14em; text-transform: uppercase; font-size: .9rem; }
+    #qr { display: inline-block; padding: 18px; background: #fff; border-radius: 20px; margin: 22px 0 14px; }
     #qr img, #qr canvas { display: block; width: 300px; height: 300px; }
-    .url { color: var(--muted); font-size: 1rem; word-break: break-all; }
+    .steps { color: var(--muted); font-size: 1.05rem; }
+    .steps b { color: var(--text); }
     @media print {
-      :root { --bg: #fff; --text: #000; --muted: #444; --accent: #000; }
+      body { background: #fff; }
+      :root { --text: #000; --muted: #333; --accent: #a34a00; }
       .noprint { display: none; }
     }
   </style>
 </head>
 <body>
-  <div class="eyebrow" id="party" style="font-size:1rem;letter-spacing:.06em;text-transform:none">🪔 Himanshu and Kirti’s Diwali Party 🪔</div>
-  <div style="font-size:1.4rem;font-weight:800;margin-top:6px" id="dj">DJ Darshan</div>
-  <div class="big">🎵 Scan to add a song</div>
-  <p class="sub">No app or login needed.</p>
+  <div class="party" id="party">🪔 Himanshu and Kirti’s Diwali Party 🪔</div>
+  <div class="title">Diwali Song<br>Request Queue</div>
+  <div class="dj" id="dj">with DJ Darshan</div>
   <div id="qr"></div>
-  <div class="url" id="url"></div>
-  <p class="noprint" style="margin-top:28px"><button class="go" onclick="print()">Print poster</button></p>
+  <div class="steps"><b>Scan</b> · pick a song · add a dedication 💌</div>
+  <p class="sub" style="margin-top:6px">No app or login needed.</p>
+  <p class="noprint" style="margin-top:22px"><button class="go" onclick="print()">Print poster</button></p>
 
 <script>
-// The guest page lives at the root of this same site.
-const target = location.origin + '/';
-document.getElementById('url').textContent = target.replace(/^https?:\/\//, '').replace(/\/$/, '');
+// The QR code opens the guest page on this same site. The address itself isn't printed.
 new QRCode(document.getElementById('qr'), {
-  text: target, width: 600, height: 600,          // drawn large, displayed at 300px for crisp printing
+  text: location.origin + '/', width: 600, height: 600,   // drawn large, shown at 300px for crisp printing
   colorDark: '#000000', colorLight: '#ffffff',
   correctLevel: QRCode.CorrectLevel.M,
 });
 fetch('/api/nowplaying').then((r) => r.json()).then((d) => {
   if (d.partyName) document.getElementById('party').textContent = `🪔 ${d.partyName} 🪔`;
-  if (d.djName) document.getElementById('dj').textContent = d.djName;
+  if (d.djName) document.getElementById('dj').textContent = `with ${d.djName}`;
 }).catch(() => {});
 </script>
 </body>

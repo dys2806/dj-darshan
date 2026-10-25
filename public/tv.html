@@ -134,7 +134,7 @@
         <div class="qrtext">
           <div class="big">🎵 Scan to add a song</div>
           <div class="small">No app or login. Add a dedication too 💌</div>
-          <div class="url" id="url"></div>
+          <div class="url">Diwali Song Request Queue</div>
         </div>
       </div>
     </section>
@@ -159,7 +159,6 @@ fx.ambient(4500, 1.6); // bigger, more frequent fireworks on a big screen
 
 // ---- QR code pointing at the guest page ----------------------------------------
 const target = location.origin + '/';
-$('url').textContent = target.replace(/^https?:\/\//, '').replace(/\/$/, '');
 new QRCode($('qr'), { text: target, width: 512, height: 512, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
 
 // ---- full screen + keep the screen awake ------------------------------------------
